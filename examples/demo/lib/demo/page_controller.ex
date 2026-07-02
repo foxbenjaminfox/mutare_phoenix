@@ -17,4 +17,9 @@ defmodule Demo.PageController do
     |> Plug.Conn.put_status(:created)
     |> Phoenix.Controller.json(%{id: 1})
   end
+
+  @doc "Redirect to the login page with an explicit temporary redirect."
+  def login(conn, _params) do
+    Phoenix.Controller.redirect(conn, to: "/login", status: :found)
+  end
 end

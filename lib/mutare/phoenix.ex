@@ -13,11 +13,13 @@ defmodule Mutare.Phoenix do
       # .mutare.exs
       [mutators: [:builtins] ++ Mutare.Phoenix.all()]
 
-  `all/0` returns this package's two families:
+  `all/0` returns this package's three families:
 
     * `Mutare.Phoenix.Plug` — `:plug_halt`, removes `Plug.Conn.halt/1`.
     * `Mutare.Phoenix.Response` — `:http_status`, swaps the atom status of
       `Plug.Conn.put_status/2`, `send_resp/3`, and `resp/3` for a same-family sibling.
+    * `Mutare.Phoenix.Redirect` — `:redirect_status`, swaps the explicit atom
+      `:status` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling.
 
   Each family matches its call written directly (`Plug.Conn.halt(conn)`), aliased, or
   bare-imported (`halt(conn)`, the form `use MyAppWeb, :controller` produces).
@@ -27,14 +29,14 @@ defmodule Mutare.Phoenix do
   # `Phoenix.Router`), so this package depends on neither `phoenix` nor `plug` — resolution
   # happens in the target project, where they are present. LiveView is out of scope; it is
   # handled by the companion `mutare_phoenix_live_view`.
-  @families [Mutare.Phoenix.Plug, Mutare.Phoenix.Response]
+  @families [Mutare.Phoenix.Plug, Mutare.Phoenix.Response, Mutare.Phoenix.Redirect]
 
   @doc """
-  This package's two mutator families, for splicing into `:mutators` (see the module
+  This package's three mutator families, for splicing into `:mutators` (see the module
   docs for the `:builtins` pairing).
 
       iex> Mutare.Phoenix.all()
-      [Mutare.Phoenix.Plug, Mutare.Phoenix.Response]
+      [Mutare.Phoenix.Plug, Mutare.Phoenix.Response, Mutare.Phoenix.Redirect]
   """
   @spec all() :: [module()]
   def all, do: @families

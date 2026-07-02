@@ -38,6 +38,13 @@ defmodule Phoenix.Controller do
 
   def json(%Conn{} = conn, data), do: Conn.send_resp(conn, conn.status || 200, data)
   def text(%Conn{} = conn, data), do: Conn.send_resp(conn, conn.status || 200, data)
+
+  def redirect(%Conn{} = conn, opts) when is_list(opts) do
+    conn
+    |> Conn.put_status(Keyword.get(opts, :status, :found))
+    |> Conn.put_resp_content_type("text/html")
+    |> Map.put(:resp_body, Keyword.get(opts, :to) || Keyword.get(opts, :external))
+  end
 end
 
 defmodule Phoenix.Router do

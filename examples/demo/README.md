@@ -17,8 +17,8 @@ mix compile
 mix mutare examples/demo
 ```
 
-It scans 6 mutants across 2 files and reports three survivors — one per gap below — for a
-mutation score of 50.0%:
+It scans 8 mutants across 2 files and reports five survivors across the three visible gaps
+below, for a mutation score of 37.5%:
 
 ```
 lib/demo/auth.ex:17  [plug_halt, in-place]  SURVIVED
@@ -33,7 +33,15 @@ lib/demo/page_controller.ex:17  [http_status, in-place]  SURVIVED
 -    |> Plug.Conn.put_status(:created)
 +    |> Plug.Conn.put_status(:accepted)
 
-mutation score: 50.0%  (3 killed, 3 survived, 6 total)
+lib/demo/page_controller.ex:23  [redirect_status, in-place]  SURVIVED
+-    Phoenix.Controller.redirect(conn, to: "/login", status: :found)
++    Phoenix.Controller.redirect(conn, to: "/login", status: :moved_permanently)
+
+lib/demo/page_controller.ex:23  [redirect_status, in-place]  SURVIVED
+-    Phoenix.Controller.redirect(conn, to: "/login", status: :found)
++    Phoenix.Controller.redirect(conn, to: "/login", status: :see_other)
+
+mutation score: 37.5%  (3 killed, 5 survived, 8 total)
 ```
 
 Each survivor is a real test-quality gap. Grouped by family:
@@ -50,12 +58,18 @@ Each survivor is a real test-quality gap. Grouped by family:
   Two survivors, one per plausible sibling. (Contrast `index`, which **does** assert
   `:ok` — its `:created`/`:no_content` mutants are killed.)
 
+- **`:redirect_status` — the unasserted redirect status** (`Demo.PageController.login`).
+  `login` redirects to `"/login"` with an explicit `:found`, but its test checks only the
+  target. So changing the status to another valid redirect status (`:moved_permanently`,
+  `:see_other`) is invisible. Two survivors, one per plausible sibling.
+
 The lesson is the package's whole thesis: when a function's behaviour *is* its conn
 transformation, asserting "something happened" isn't enough — you have to assert *which*
 transformation, with *what* arguments. Mutare turns every place you didn't into a survivor.
 
-> Why `:ok → :error` (or `:mutare`) doesn't already cover `:http_status`: in a status
+> Why `:ok → :error` (or `:mutare`) doesn't already cover `:http_status` /
+> `:redirect_status`: in a status
 > position both of Mutare's built-in atom swaps **crash** (`:error`/`:mutare` aren't valid
-> statuses), an uninformative kill. `:http_status` swaps to a *valid* sibling so a survivor
-> means a genuine missing assertion, not a crash — and Mutare's overlap pruning drops the
+> statuses), an uninformative kill. These families swap to a *valid* sibling so a survivor
+> means a genuine missing assertion, not a crash — and Mutare's overlap pruning drops
 > redundant crashing leaves.

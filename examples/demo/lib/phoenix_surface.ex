@@ -20,4 +20,9 @@ defmodule Phoenix.Controller do
 
   @doc "Render a response body, keeping whatever status was set."
   def json(%Conn{} = conn, data), do: %{conn | resp_body: data}
+
+  @doc "Redirect to a local path, keeping the explicit redirect status when present."
+  def redirect(%Conn{} = conn, opts) when is_list(opts) do
+    %{conn | status: Keyword.get(opts, :status, :found), resp_body: Keyword.fetch!(opts, :to)}
+  end
 end

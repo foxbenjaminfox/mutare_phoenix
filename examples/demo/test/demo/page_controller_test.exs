@@ -18,4 +18,12 @@ defmodule Demo.PageControllerTest do
     conn = PageController.create(%Plug.Conn{}, %{})
     assert conn.resp_body == %{id: 1}
   end
+
+  # login asserts only the redirect target, never the redirect status — so changing
+  # :found to another valid redirect status is invisible. A missing redirect-status
+  # assertion: :redirect_status survives.
+  test "login redirects to the login page" do
+    conn = PageController.login(%Plug.Conn{}, %{})
+    assert conn.resp_body == "/login"
+  end
 end

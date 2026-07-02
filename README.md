@@ -9,17 +9,21 @@ These are exactly the calls a suite tends to under-assert: a test that checks "s
 happened" but not *which* transformation leaves a gap. `mutare_phoenix` turns each such gap
 into a located [Mutare](https://hex.pm/packages/mutare) survivor.
 
-## The two families
+## The three families
 
-`Mutare.Phoenix.all/0` returns two mutator families:
+`Mutare.Phoenix.all/0` returns three mutator families:
 
 | Family | Name | Mutation | The gap a survivor exposes |
 | --- | --- | --- | --- |
 | `Mutare.Phoenix.Plug` | `:plug_halt` | removes `Plug.Conn.halt/1` | no test depends on this plug *halting* — the classic authorization-bypass |
 | `Mutare.Phoenix.Response` | `:http_status` | swaps the atom status of `Plug.Conn.put_status/2`, `send_resp/3`, and `resp/3` for a same-family sibling (`:ok → :created`, `:unauthorized → :forbidden`) | no test pins the exact status |
+| `Mutare.Phoenix.Redirect` | `:redirect_status` | swaps the explicit atom `status:` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling (`:found → :see_other`, `:moved_permanently → :permanent_redirect`) | no test pins the exact redirect status |
 
 Each family matches its call written directly (`Plug.Conn.halt(conn)`), aliased, or
 bare-imported (`halt(conn)`, the form `use MyAppWeb, :controller` produces).
+`:redirect_status` only mutates an explicit literal atom `status:` option; redirects that
+rely on Phoenix's default, integer statuses, and variable statuses are left to other
+families or skipped.
 
 ## Usage
 
@@ -63,7 +67,8 @@ yourself, so expand `Mutare.Phoenix.all/0` into its members and replace that one
   mutators: [
     :builtins,
     Mutare.Phoenix.Plug,
-    {Mutare.Phoenix.Response, swaps: %{ok: [:created], no_content: [], im_a_teapot: [:bad_request]}}
+    {Mutare.Phoenix.Response, swaps: %{ok: [:created], no_content: [], im_a_teapot: [:bad_request]}},
+    Mutare.Phoenix.Redirect
   ]
 ]
 ```
@@ -76,9 +81,9 @@ valid-but-wrong swap. See `Mutare.Phoenix.Response` for the full table.
 
 In a status position, Mutare's built-in atom swaps (`:ok → :error` / `:mutare`) produce a
 value that **crashes** — an uninformative kill that tells you nothing about test quality.
-`:http_status` swaps to a *valid* sibling, so a survivor means a genuine missing assertion
-rather than a crash, and Mutare's overlap pruning drops the redundant crashing leaves at the
-same range.
+`:http_status` and `:redirect_status` swap to *valid* siblings, so a survivor means a
+genuine missing assertion rather than a crash, and Mutare's overlap pruning drops the
+redundant crashing leaves at the same range.
 
 ## Example
 

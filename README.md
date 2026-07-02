@@ -82,7 +82,7 @@ same range.
 
 ## Example
 
-[`examples/demo`](https://github.com/foxbenjaminfox/mutare_phoenix/tree/master/examples/demo) is
+[`examples/demo`](https://github.com/foxbenjaminfox/mutare_phoenix/tree/HEAD/examples/demo) is
 a standalone mini-project — an auth plug and a few
 controller actions over a tiny `Plug.Conn` / `Phoenix.Controller` stand-in — with deliberate
 test gaps that surface a survivor in each family. From the repo root:

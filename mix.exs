@@ -31,11 +31,11 @@ defmodule MutarePhoenix.MixProject do
   defp deps do
     [
       # The host mutation-testing engine. `mutare_phoenix` implements
-      # `Mutare.Mutator` and rides only its public extension points
-      # (`Mutare.Transform.Calls`, `Mutare.AST`, `Mutare.Mutator`, the `macros/0`
-      # hook). Tests use `Mutare.Test` and `Mutare.AST` for AST parse/render, so no
-      # direct `:sourceror` dep is needed. A path dep for local development until
-      # `mutare` is published; a consuming project depends on both as `:dev`/`:test` deps.
+      # `Mutare.Mutator` / `Mutare.MacroRouting` and rides only its public extension
+      # points (`Mutare.Transform.Calls`, `Mutare.AST`). Tests use `Mutare.Test` and
+      # `Mutare.AST` for AST parse/render, so no direct `:sourceror` dep is needed.
+      # A path dep for local development until `mutare` is published; a consuming
+      # project depends on both as `:dev`/`:test` deps.
       {:mutare, path: "../mutare"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
@@ -55,7 +55,7 @@ defmodule MutarePhoenix.MixProject do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", "LICENSE"],
+      extras: ["README.md", "CHANGELOG.md", "LICENSE"],
       source_ref: "v#{@version}"
     ]
   end
@@ -65,14 +65,15 @@ defmodule MutarePhoenix.MixProject do
   end
 
   defp description do
-    "Custom Mutare mutators for Phoenix."
+    "Custom Mutare mutators for the Phoenix request surface — " <>
+      "the Plug.Conn / Phoenix.Controller calls a plug or controller action performs."
   end
 
   defp package do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => "https://github.com/foxbenjaminfox/mutare_phoenix"},
-      files: ~w(lib mix.exs README.md .formatter.exs LICENSE)
+      files: ~w(lib mix.exs README.md CHANGELOG.md .formatter.exs LICENSE)
     ]
   end
 end

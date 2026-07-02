@@ -1,0 +1,20 @@
+defmodule Demo.PageController do
+  @moduledoc """
+  A few controller actions, each performing one conn transformation whose correctness
+  lives entirely in *which* call ran — the status it set.
+  """
+
+  @doc "Render a welcome payload with an explicit 200."
+  def index(conn, _params) do
+    conn
+    |> Plug.Conn.put_status(:ok)
+    |> Phoenix.Controller.json(%{message: "welcome"})
+  end
+
+  @doc "Create a record and answer 201 Created."
+  def create(conn, _params) do
+    conn
+    |> Plug.Conn.put_status(:created)
+    |> Phoenix.Controller.json(%{id: 1})
+  end
+end

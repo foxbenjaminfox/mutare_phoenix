@@ -3,8 +3,8 @@ defmodule Mutare.Phoenix.ResponseTest do
   `:http_status` — swaps the *atom* status of `Plug.Conn.put_status/2`, `send_resp/3`,
   `resp/3`, `send_chunked/2`, and `send_file/3,4,5` for a plausible same-family sibling
   (atoms only; integers stay with `Literal`). Pipe-aware, and it supersedes the crashing
-  `AtomLiteral` `:mutare` leaf. Also carries the defensive `Phoenix.Router` `:skip`
-  registration.
+  `AtomLiteral` `:mutare` leaf. Also carries the defensive Phoenix macro `:skip`
+  registrations.
   """
   use ExUnit.Case, async: true
 
@@ -320,7 +320,7 @@ defmodule Mutare.Phoenix.ResponseTest do
     end
   end
 
-  describe "macro_routes/0 — defensive Phoenix.Router :skip" do
+  describe "macro_routes/0 — defensive Phoenix macro :skip" do
     test "registers the router DSL so core leaves route definitions raw" do
       registry = Registry.build([], Mutare.Mutators.resolve([Response]))
 
@@ -339,9 +339,45 @@ defmodule Mutare.Phoenix.ResponseTest do
       assert routing(registry, [:Phoenix, :Router], :unknown, 1) == nil
     end
 
-    test "every registered entry targets Phoenix.Router and skips" do
-      for {Phoenix.Router, name, :any, :skip} <- Response.macro_routes() do
+    test "registers Phoenix.Component.sigil_H/2 so HEEx sigil arguments stay literal" do
+      registry = Registry.build([], Mutare.Mutators.resolve([Response]))
+
+      assert routing(registry, [:Phoenix, :Component], :sigil_H, 2) == [:skip, :skip]
+    end
+
+    test "a ~H return expression does not generate an imported-macro witness" do
+      source =
+        [
+          "defmodule C do",
+          "  import Phoenix.Component",
+          "",
+          "  def render(assigns), do: ~H\"\"\"",
+          "  <p>{@name}</p>",
+          "  \"\"\"",
+          "end"
+        ]
+        |> Enum.join("\n")
+
+      metamutant = metamutant_source(source, [:builtins, Response])
+
+      refute metamutant =~ "fn mutare_import_arg1, mutare_import_arg2 ->"
+      refute metamutant =~ "sigil_H(mutare_import_arg1, mutare_import_arg2)"
+
+      return_pairs = diffs_for(source, [:builtins, Response], :return_value)
+      assert Enum.map(return_pairs, &elem(&1, 1)) == ["nil", ":mutare"]
+
+      assert Enum.all?(return_pairs, fn {original, _mutated} ->
+               String.starts_with?(original, "~H")
+             end)
+
+      assert_metamutant_compiles(source, [:builtins, Response])
+    end
+
+    test "every registered route skips the matched macro arguments" do
+      for {module, name, arity, :skip} <- Response.macro_routes() do
+        assert module in [Phoenix.Router, Phoenix.Component]
         assert is_atom(name)
+        assert arity == :any or (is_integer(arity) and arity >= 0)
       end
     end
   end

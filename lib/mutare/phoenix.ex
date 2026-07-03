@@ -28,6 +28,11 @@ defmodule Mutare.Phoenix do
 
   Each family matches its call written directly (`Plug.Conn.halt(conn)`), aliased, or
   bare-imported (`halt(conn)`, the form `use MyAppWeb, :controller` produces).
+
+  The package also registers defensive `Mutare.MacroRouting` entries through the enabled
+  families so Phoenix compile-time macros do not poison the metamutant build. Today that means
+  skipping `Phoenix.Router` DSL arguments and `Phoenix.Component.sigil_H/2` HEEx sigil
+  arguments.
   """
 
   # Mutators pattern-match module *names* (`Plug.Conn`, `Phoenix.Controller`,

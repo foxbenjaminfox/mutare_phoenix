@@ -93,3 +93,10 @@ defmodule Phoenix.Router do
   # Only needs to *exist* as a module-key target for the `macro_routes/0` `:skip` registration
   # test; the registration is purely syntactic, so no DSL macros are required here.
 end
+
+defmodule Phoenix.Component do
+  @moduledoc false
+  # A tiny literal-only `~H` stand-in. It intentionally accepts only real sigil syntax,
+  # not `sigil_H(arg1, arg2)`, so tests cover Mutare's imported-macro witness hazard.
+  defmacro sigil_H({:<<>>, _meta, _segments}, []), do: quote(do: {:safe, ""})
+end

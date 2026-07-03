@@ -28,6 +28,12 @@ bare-imported (`halt(conn)`, the form `use MyAppWeb, :controller` produces).
 rely on Phoenix's default, integer statuses, and variable statuses are left to other
 families or skipped.
 
+The package also registers defensive macro routes for Phoenix compile-time macros that are
+easy to poison accidentally: Phoenix router DSL arguments are skipped, and
+`Phoenix.Component.sigil_H/2` (`~H`) arguments are left as compile-time literals. That keeps
+HEEx sigils from blocking the metamutant build while still allowing ordinary mutations around
+the whole expression, such as a `render/1` return-value mutant.
+
 ## Usage
 
 `mutare_phoenix` rides on the [Mutare](https://hex.pm/packages/mutare) engine, so add both as

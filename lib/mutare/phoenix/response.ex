@@ -12,8 +12,13 @@ defmodule Mutare.Phoenix.Response do
   built-in literal family. Matches each call written directly, aliased, or bare-imported
   (from `use MyAppWeb, :controller`).
 
-  Also registers the `Phoenix.Router` DSL (`get`/`post`/`scope`/…) as `:skip` via
-  `Mutare.MacroRouting`, so Mutare leaves compile-time route definitions unmutated.
+  Also registers compile-time-only Phoenix macros as `:skip` via `Mutare.MacroRouting`,
+  so Mutare leaves Phoenix's DSL/literal macro inputs unmutated:
+
+    * the `Phoenix.Router` DSL (`get`/`post`/`scope`/…) because route definitions run at
+      compile time under Mutare's compile-once model;
+    * `Phoenix.Component.sigil_H/2` because HEEx sigil arguments must remain compile-time
+      literals.
 
   ## Configurable
 
@@ -128,6 +133,14 @@ defmodule Mutare.Phoenix.Response do
     :pipe_through
   ]
 
+  # `~H` compiles to `Phoenix.Component.sigil_H/2`, whose arguments must stay literal.
+  # Leaving it unregistered lets Mutare's imported-call witness generate an unreachable
+  # `sigil_H(arg1, arg2)`; macros still expand in unreachable code, so Phoenix raises before
+  # poison recovery can identify a single mutant. Routing both arguments `:skip` drops that
+  # witness and keeps the sigil payload opaque while mutations around the whole expression
+  # (for example `:return_value`) remain available.
+  @component_macros [{Phoenix.Component, :sigil_H, 2, :skip}]
+
   @impl Mutare.Mutator
   @spec name() :: :http_status
   def name, do: :http_status
@@ -138,7 +151,9 @@ defmodule Mutare.Phoenix.Response do
   # *function* bodies (`def call/2`) are ordinary runtime code and are still mutated.
   @impl Mutare.MacroRouting
   @spec macro_routes() :: [Mutare.MacroRouting.route()]
-  def macro_routes, do: for(name <- @router_macros, do: {Phoenix.Router, name, :any, :skip})
+  def macro_routes do
+    Enum.map(@router_macros, &{Phoenix.Router, &1, :any, :skip}) ++ @component_macros
+  end
 
   # No `mutate/1`: the status atom's position depends on the call's effective arity,
   # which isn't knowable without pipe context — so this family produces only through

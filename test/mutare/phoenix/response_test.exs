@@ -1,9 +1,10 @@
 defmodule Mutare.Phoenix.ResponseTest do
   @moduledoc """
-  `:http_status` — swaps the *atom* status of `Plug.Conn.put_status/2`, `send_resp/3`, and
-  `resp/3` for a plausible same-family sibling (atoms only; integers stay with `Literal`).
-  Pipe-aware, and it supersedes the crashing `AtomLiteral` `:mutare` leaf. Also carries the
-  defensive `Phoenix.Router` `:skip` registration.
+  `:http_status` — swaps the *atom* status of `Plug.Conn.put_status/2`, `send_resp/3`,
+  `resp/3`, `send_chunked/2`, and `send_file/3,4,5` for a plausible same-family sibling
+  (atoms only; integers stay with `Literal`). Pipe-aware, and it supersedes the crashing
+  `AtomLiteral` `:mutare` leaf. Also carries the defensive `Phoenix.Router` `:skip`
+  registration.
   """
   use ExUnit.Case, async: true
 
@@ -122,6 +123,71 @@ defmodule Mutare.Phoenix.ResponseTest do
     test "a send_resp of an unexpected arity is left alone" do
       source = "defmodule C do\n  def show(c), do: Plug.Conn.send_resp(c, :ok)\nend\n"
       assert status_diffs(source) == []
+    end
+  end
+
+  describe "send_chunked/2 and send_file/3,4,5 — the same status seam" do
+    test "send_chunked/2 swaps its atom status" do
+      source = """
+      defmodule C do
+        def show(c), do: Plug.Conn.send_chunked(c, :not_found)
+      end
+      """
+
+      assert status_diffs(source) == [
+               {"Plug.Conn.send_chunked(c, :not_found)", "Plug.Conn.send_chunked(c, :gone)"},
+               {"Plug.Conn.send_chunked(c, :not_found)", "Plug.Conn.send_chunked(c, :forbidden)"}
+             ]
+    end
+
+    test "send_file/3 swaps its atom status" do
+      source = """
+      defmodule C do
+        def show(c), do: Plug.Conn.send_file(c, :ok, "/tmp/a")
+      end
+      """
+
+      assert status_diffs(source) == [
+               {"Plug.Conn.send_file(c, :ok, \"/tmp/a\")",
+                "Plug.Conn.send_file(c, :created, \"/tmp/a\")"},
+               {"Plug.Conn.send_file(c, :ok, \"/tmp/a\")",
+                "Plug.Conn.send_file(c, :no_content, \"/tmp/a\")"}
+             ]
+    end
+
+    test "send_file/4 swaps its atom status" do
+      source = """
+      defmodule C do
+        def show(c), do: Plug.Conn.send_file(c, :unauthorized, "/tmp/a", 0)
+      end
+      """
+
+      assert status_diffs(source) == [
+               {"Plug.Conn.send_file(c, :unauthorized, \"/tmp/a\", 0)",
+                "Plug.Conn.send_file(c, :forbidden, \"/tmp/a\", 0)"}
+             ]
+    end
+
+    test "send_file/5 swaps its atom status" do
+      source = """
+      defmodule C do
+        def show(c), do: Plug.Conn.send_file(c, :unauthorized, "/tmp/a", 0, 10)
+      end
+      """
+
+      assert status_diffs(source) == [
+               {"Plug.Conn.send_file(c, :unauthorized, \"/tmp/a\", 0, 10)",
+                "Plug.Conn.send_file(c, :forbidden, \"/tmp/a\", 0, 10)"}
+             ]
+    end
+
+    test "piped send_file/3 finds the status at visible index 0" do
+      source = controller("  def show(conn), do: conn |> send_file(:not_found, \"/tmp/a\")")
+
+      assert status_diffs(source) == [
+               {"send_file(:not_found, \"/tmp/a\")", "send_file(:gone, \"/tmp/a\")"},
+               {"send_file(:not_found, \"/tmp/a\")", "send_file(:forbidden, \"/tmp/a\")"}
+             ]
     end
   end
 
@@ -322,6 +388,10 @@ defmodule Mutare.Phoenix.ResponseTest do
 
       def send_it(conn), do: send_resp(conn, :not_found, "")
       def resp_it(conn), do: resp(conn, :unauthorized, "")
+      def chunk_it(conn), do: send_chunked(conn, :ok)
+      def file_it(conn), do: send_file(conn, :not_found, "/tmp/a")
+      def file_offset_it(conn), do: send_file(conn, :unauthorized, "/tmp/a", 0)
+      def file_range_it(conn), do: send_file(conn, :unauthorized, "/tmp/a", 0, 10)
     end
     """
 

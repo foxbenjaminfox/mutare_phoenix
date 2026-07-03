@@ -4,20 +4,23 @@ Custom [Mutare](https://hex.pm/packages/mutare) mutators for the **Phoenix reque
 the `Plug.Conn` / `Phoenix.Controller` calls a plug or controller action performs.
 
 A plug or action returns a *transformed conn*, so its whole contract is **which
-conn-transforming call ran** — the status it set, whether it halted.
+conn-transforming call ran** — the status/header/session/cookie it set, whether it halted.
 These are exactly the calls a suite tends to under-assert: a test that checks "something
 happened" but not *which* transformation leaves a gap. `mutare_phoenix` turns each such gap
 into a located [Mutare](https://hex.pm/packages/mutare) survivor.
 
-## The three families
+## The families
 
-`Mutare.Phoenix.all/0` returns three mutator families:
+`Mutare.Phoenix.all/0` returns six mutator families:
 
 | Family | Name | Mutation | The gap a survivor exposes |
 | --- | --- | --- | --- |
 | `Mutare.Phoenix.Plug` | `:plug_halt` | removes `Plug.Conn.halt/1` | no test depends on this plug *halting* — the classic authorization-bypass |
-| `Mutare.Phoenix.Response` | `:http_status` | swaps the atom status of `Plug.Conn.put_status/2`, `send_resp/3`, and `resp/3` for a same-family sibling (`:ok → :created`, `:unauthorized → :forbidden`) | no test pins the exact status |
+| `Mutare.Phoenix.Response` | `:http_status` | swaps the atom status of `Plug.Conn.put_status/2`, `send_resp/3`, `resp/3`, `send_chunked/2`, and `send_file/3,5` for a same-family sibling (`:ok → :created`, `:unauthorized → :forbidden`) | no test pins the exact status |
 | `Mutare.Phoenix.Redirect` | `:redirect_status` | swaps the explicit atom `status:` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling (`:found → :see_other`, `:moved_permanently → :permanent_redirect`) | no test pins the exact redirect status |
+| `Mutare.Phoenix.Session` | `:plug_session` | removes `Plug.Conn.put_session/3`, `delete_session/2`, and `clear_session/1` | no test depends on the session mutation |
+| `Mutare.Phoenix.Header` | `:resp_header` | removes `Plug.Conn.put_resp_header/3` and `delete_resp_header/2` | no test depends on the response header mutation |
+| `Mutare.Phoenix.Cookie` | `:resp_cookie` | removes `Plug.Conn.put_resp_cookie/3,4` and `delete_resp_cookie/2,3`, and flips explicit string `same_site:` values | no test depends on the response cookie or its SameSite policy |
 
 Each family matches its call written directly (`Plug.Conn.halt(conn)`), aliased, or
 bare-imported (`halt(conn)`, the form `use MyAppWeb, :controller` produces).
@@ -68,7 +71,10 @@ yourself, so expand `Mutare.Phoenix.all/0` into its members and replace that one
     :builtins,
     Mutare.Phoenix.Plug,
     {Mutare.Phoenix.Response, swaps: %{ok: [:created], no_content: [], im_a_teapot: [:bad_request]}},
-    Mutare.Phoenix.Redirect
+    Mutare.Phoenix.Redirect,
+    Mutare.Phoenix.Session,
+    Mutare.Phoenix.Header,
+    Mutare.Phoenix.Cookie
   ]
 ]
 ```
@@ -88,9 +94,9 @@ redundant crashing leaves at the same range.
 ## Example
 
 [`examples/demo`](https://github.com/foxbenjaminfox/mutare_phoenix/tree/HEAD/examples/demo) is
-a standalone mini-project — an auth plug and a few
-controller actions over a tiny `Plug.Conn` / `Phoenix.Controller` stand-in — with deliberate
-test gaps that surface a survivor in each family. From the repo root:
+a standalone mini-project — an auth plug and a few controller actions over a tiny
+`Plug.Conn` / `Phoenix.Controller` stand-in — with deliberate test gaps that surface survivors
+in the halt/status/redirect families. From the repo root:
 
 ```
 mix compile

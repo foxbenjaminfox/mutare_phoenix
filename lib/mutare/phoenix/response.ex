@@ -1,8 +1,8 @@
 defmodule Mutare.Phoenix.Response do
   @moduledoc """
-  `:http_status` — swaps the atom status of `Plug.Conn.put_status/2`, `send_resp/3`, and
-  `resp/3` for a plausible sibling in the same status family. A surviving mutant means no
-  test pins the exact status code.
+  `:http_status` — swaps the atom status of `Plug.Conn.put_status/2`, `send_resp/3`,
+  `resp/3`, `send_chunked/2`, and `send_file/3,4,5` for a plausible sibling in the same
+  status family. A surviving mutant means no test pins the exact status code.
 
       put_status(conn, :ok)            # → :created / :no_content
       put_status(conn, :unauthorized)  # → :forbidden
@@ -33,7 +33,11 @@ defmodule Mutare.Phoenix.Response do
           :builtins,
           Mutare.Phoenix.Plug,
           {Mutare.Phoenix.Response,
-           swaps: %{ok: [:created], no_content: [], im_a_teapot: [:bad_request]}}
+           swaps: %{ok: [:created], no_content: [], im_a_teapot: [:bad_request]}},
+          Mutare.Phoenix.Redirect,
+          Mutare.Phoenix.Session,
+          Mutare.Phoenix.Header,
+          Mutare.Phoenix.Cookie
         ]
       ]
 
@@ -88,12 +92,21 @@ defmodule Mutare.Phoenix.Response do
     gateway_timeout: [:service_unavailable]
   }
 
-  # The `Plug.Conn` calls that carry a swappable atom status, each mapped to the arity at
-  # which the status sits at (effective) argument index 1 — the second positional argument in
-  # every case: `put_status(conn, status)`, `send_resp(conn, status, body)`, `resp(conn,
-  # status, body)`. The arity is call-specific so a wrong-arity call (`put_status(c, :ok,
-  # :extra)`, `send_resp(c, :ok)`) resolves but contributes no mutation.
-  @status_calls %{put_status: 2, send_resp: 3, resp: 3}
+  # The `Plug.Conn` calls that carry a swappable atom status. In every supported call, the
+  # status sits at effective argument index 1 — the second positional argument:
+  # `put_status(conn, status)`, `send_resp(conn, status, body)`, `send_file(conn, status,
+  # path)`, and so on. The arity is call-specific so a wrong-arity call
+  # (`put_status(c, :ok, :extra)`, `send_resp(c, :ok)`) resolves but contributes no
+  # mutation.
+  @status_calls MapSet.new([
+                  {:put_status, 2},
+                  {:send_resp, 3},
+                  {:resp, 3},
+                  {:send_chunked, 2},
+                  {:send_file, 3},
+                  {:send_file, 4},
+                  {:send_file, 5}
+                ])
 
   # The `Phoenix.Router` DSL, registered `:skip` so core leaves route definitions raw.
   # `:any` arity covers every form (`get/3`, `get/4`, `scope/2..4`, …).
@@ -134,7 +147,7 @@ defmodule Mutare.Phoenix.Response do
   @spec mutate(Macro.t(), Mutare.Mutator.context()) :: :skip | [Macro.t()]
   def mutate(node, %{pipe_mode: pipe_mode} = context) do
     case Calls.resolved_call(node) do
-      {[:Plug, :Conn], call, args, rebuild} when is_map_key(@status_calls, call) ->
+      {[:Plug, :Conn], call, args, rebuild} ->
         status_mutations(call, args, pipe_mode, rebuild, swaps_table(context))
 
       _other ->
@@ -160,9 +173,9 @@ defmodule Mutare.Phoenix.Response do
           swaps()
         ) :: :skip | [Macro.t()]
   defp status_mutations(call, args, pipe_mode, rebuild, swaps) do
-    expected_arity = Map.fetch!(@status_calls, call)
-
-    with ^expected_arity <- Mutare.Mutator.effective_arity(args, pipe_mode),
+    with effective_arity when is_integer(effective_arity) <-
+           Mutare.Mutator.effective_arity(args, pipe_mode),
+         true <- MapSet.member?(@status_calls, {call, effective_arity}),
          vis when is_integer(vis) <- Mutare.Mutator.visible_index(1, pipe_mode),
          status_node = Enum.at(args, vis),
          atom when not is_nil(atom) <- status_atom(status_node),

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`mutare_phoenix` is an Elixir library of **custom [Mutare](https://hex.pm/packages/mutare) mutators** for the Phoenix request surface — the `Plug.Conn` / `Phoenix.Controller` calls a plug or controller action performs. It does not test Phoenix apps directly; it plugs into the Mutare mutation-testing engine and adds two mutator families that turn under-asserted conn transforms into located survivors. See `README.md` for the user-facing description of the families and `examples/demo/README.md` for a worked walkthrough.
+`mutare_phoenix` is an Elixir library of **custom [Mutare](https://hex.pm/packages/mutare) mutators** for the Phoenix request surface — the `Plug.Conn` / `Phoenix.Controller` calls a plug or controller action performs. It does not test Phoenix apps directly; it plugs into the Mutare mutation-testing engine and adds focused mutator families that turn under-asserted conn transforms into located survivors. See `README.md` for the user-facing description of the families and `examples/demo/README.md` for a worked walkthrough.
 
 ## Commands
 
@@ -41,12 +41,16 @@ mix mutare examples/demo           # appends the compiled package's ebins to its
 
 The package depends on **neither `phoenix` nor `plug`**. Mutators pattern-match module *names* as AST atoms (`[:Plug, :Conn]`, `[:Phoenix, :Controller]`, `Phoenix.Router`) — alias/import resolution happens in the *target* project where those libs are present. This is the single most important constraint: never add a runtime call into `Plug.Conn`, `Phoenix.Controller`, or `Plug.Conn.Status`. For example, configured `:http_status` siblings are *trusted* to be valid statuses rather than validated, precisely to avoid reaching into the target project's `Plug.Conn.Status`.
 
-### The two families (each a `Mutare.Mutator`)
+### The families (each a `Mutare.Mutator`)
 
 Registered in `lib/mutare/phoenix.ex` via `@families` / `all/0`:
 
 - `Mutare.Phoenix.Plug` — `:plug_halt`, removes `Plug.Conn.halt/1`.
-- `Mutare.Phoenix.Response` — `:http_status`, swaps an atom status of `put_status/2`, `send_resp/3`, `resp/3` for a same-family sibling (curated `@status_swaps` table, per-instance configurable via `{module, swaps: %{...}}`).
+- `Mutare.Phoenix.Response` — `:http_status`, swaps an atom status of `put_status/2`, `send_resp/3`, `resp/3`, `send_chunked/2`, and `send_file/3,5` for a same-family sibling (curated `@status_swaps` table, per-instance configurable via `{module, swaps: %{...}}`).
+- `Mutare.Phoenix.Redirect` — `:redirect_status`, swaps explicit redirect `status:` atoms.
+- `Mutare.Phoenix.Session` — `:plug_session`, removes `put_session/3`, `delete_session/2`, and `clear_session/1`.
+- `Mutare.Phoenix.Header` — `:resp_header`, removes `put_resp_header/3` and `delete_resp_header/2`.
+- `Mutare.Phoenix.Cookie` — `:resp_cookie`, removes `put_resp_cookie/3,4` and `delete_resp_cookie/2,3`, plus flips/drops explicit string `same_site:` options.
 
 To add a family: implement the `Mutare.Mutator` behaviour, add the module to `@families`, and add a test module mirroring the existing ones.
 
@@ -61,7 +65,7 @@ To add a family: implement the `Mutare.Mutator` behaviour, add the module to `@f
 
 `mutate/2` receives `%{pipe_mode: ...}` context; `mutate/1` is node-local with no pipe context. Both are optional (a family needs at least one producer), so implement exactly the one that fits how the swappable position behaves:
 
-- Both current families (`Plug` and `Response`) implement only `mutate/2` — removal shape / status index depend on pipe context, so a node-local `mutate/1` could never fire and is simply omitted.
+- Current conn-transform families implement only `mutate/2` — removal shape / status or option index depends on pipe context, so a node-local `mutate/1` could never fire and is simply omitted.
 - A node-local family whose swappable position is pipe-independent (e.g. a fixed last argument) would implement only `mutate/1` instead.
 
 ### Recurring AST conventions (apply to any new family)
@@ -69,7 +73,7 @@ To add a family: implement the `Mutare.Mutator` behaviour, add the module to `@f
 - **Clean-meta rule:** to change a *value* in place, keep the original node's Sourceror metadata (so it re-renders inline); only use fresh meta (e.g. `[format: :keyword]`) for genuinely new nodes. Carrying stale line metadata makes Sourceror expand calls across lines. See `swap_status/2`.
 - **Valid-but-wrong swaps + Overlap pruning:** families swap to *valid* siblings (not crashing values). Because they touch the exact same AST range as Mutare's built-in atom mutators (`:mutare`, `:error`), `Mutare.Transform.Overlap` auto-prunes the redundant crashing leaves — no declaration needed. Tests assert this (the "superseding" describe blocks).
 - **`macro_routes/0` `:skip` registration:** `Response` implements `Mutare.MacroRouting` and its `macro_routes/0` registers the `Phoenix.Router` DSL (`get`/`scope`/…) as `:skip` so Mutare leaves compile-time route definitions unmutated.
-- **Consumer-side silencing:** a deliberate site in a host project is silenced with a family-scoped `# mutare:ignore[<family>]` comment (e.g. `# mutare:ignore[http_status]`) — an engine feature (`Mutare.Ignore`), not something this package implements, but the family names this package records (`:plug_halt`, `:http_status`) are what users put in the brackets.
+- **Consumer-side silencing:** a deliberate site in a host project is silenced with a family-scoped `# mutare:ignore[<family>]` comment (e.g. `# mutare:ignore[http_status]`) — an engine feature (`Mutare.Ignore`), not something this package implements, but the family names this package records (`:plug_halt`, `:http_status`, `:plug_session`, etc.) are what users put in the brackets.
 
 ## Tests
 

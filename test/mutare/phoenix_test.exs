@@ -13,11 +13,14 @@ defmodule Mutare.PhoenixTest do
   doctest Mutare.Phoenix
 
   describe "all/0" do
-    test "is the three families in order" do
+    test "is the six families in order" do
       assert Mutare.Phoenix.all() == [
                Mutare.Phoenix.Plug,
                Mutare.Phoenix.Response,
-               Mutare.Phoenix.Redirect
+               Mutare.Phoenix.Redirect,
+               Mutare.Phoenix.Session,
+               Mutare.Phoenix.Header,
+               Mutare.Phoenix.Cookie
              ]
     end
 
@@ -29,12 +32,20 @@ defmodule Mutare.PhoenixTest do
 
     test "splices into a :mutators list after the built-ins and resolves" do
       # The usage idiom: `[:builtins] ++ Mutare.Phoenix.all()`. The `:builtins` token
-      # expands to every built-in family in place, then this package's three follow, in
-      # order.
+      # expands to every built-in family in place, then this package's families follow
+      # in order.
       specs = Mutare.Mutators.resolve([:builtins] ++ Mutare.Phoenix.all())
       names = Enum.map(specs, & &1.name)
 
-      assert Enum.take(names, -3) == [:plug_halt, :http_status, :redirect_status]
+      assert Enum.take(names, -6) == [
+               :plug_halt,
+               :http_status,
+               :redirect_status,
+               :plug_session,
+               :resp_header,
+               :resp_cookie
+             ]
+
       assert :literal in names and :atom in names
     end
   end
@@ -58,6 +69,9 @@ defmodule Mutare.PhoenixTest do
       def block(conn, _params) do
         conn
         |> put_status(:unauthorized)
+        |> put_session(:blocked, true)
+        |> put_resp_header("x-blocked", "true")
+        |> put_resp_cookie("blocked", "true", same_site: "Strict")
         |> halt()
       end
     end
@@ -71,7 +85,14 @@ defmodule Mutare.PhoenixTest do
         |> Enum.uniq()
         |> Enum.sort()
 
-      assert names == [:http_status, :plug_halt, :redirect_status]
+      assert names == [
+               :http_status,
+               :plug_halt,
+               :plug_session,
+               :redirect_status,
+               :resp_cookie,
+               :resp_header
+             ]
     end
 
     test "the whole surface compiles as one metamutant, built-ins included" do

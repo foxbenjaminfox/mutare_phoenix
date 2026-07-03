@@ -11,7 +11,12 @@
 # conn — so the bodies are the smallest thing that type-checks as `conn -> conn`.
 defmodule Plug.Conn do
   @moduledoc false
-  defstruct status: nil, halted: false, assigns: %{}, resp_headers: [], resp_body: nil
+  defstruct status: nil,
+            halted: false,
+            assigns: %{},
+            resp_headers: [],
+            resp_body: nil,
+            resp_cookies: %{}
 
   def put_status(%__MODULE__{} = conn, status), do: %{conn | status: status}
   def halt(%__MODULE__{} = conn), do: %{conn | halted: true}
@@ -27,6 +32,42 @@ defmodule Plug.Conn do
 
   def resp(%__MODULE__{} = conn, status, body),
     do: %{conn | status: status, resp_body: body}
+
+  def send_chunked(%__MODULE__{} = conn, status), do: %{conn | status: status}
+
+  def send_file(%__MODULE__{} = conn, status, path),
+    do: %{conn | status: status, resp_body: path}
+
+  def send_file(%__MODULE__{} = conn, status, path, _offset),
+    do: %{conn | status: status, resp_body: path}
+
+  def send_file(%__MODULE__{} = conn, status, path, _offset, _length),
+    do: %{conn | status: status, resp_body: path}
+
+  def put_session(%__MODULE__{} = conn, key, value),
+    do: assign(conn, :session, Map.put(Map.get(conn.assigns, :session, %{}), key, value))
+
+  def delete_session(%__MODULE__{} = conn, key),
+    do: assign(conn, :session, Map.delete(Map.get(conn.assigns, :session, %{}), key))
+
+  def clear_session(%__MODULE__{} = conn), do: assign(conn, :session, %{})
+
+  def delete_resp_header(%__MODULE__{} = conn, key),
+    do: %{conn | resp_headers: List.keydelete(conn.resp_headers, key, 0)}
+
+  def put_resp_header(%__MODULE__{} = conn, key, value),
+    do: %{conn | resp_headers: [{key, value} | List.keydelete(conn.resp_headers, key, 0)]}
+
+  def put_resp_cookie(%__MODULE__{} = conn, key, value),
+    do: put_resp_cookie(conn, key, value, [])
+
+  def put_resp_cookie(%__MODULE__{} = conn, key, value, opts),
+    do: %{conn | resp_cookies: Map.put(conn.resp_cookies, key, {value, opts})}
+
+  def delete_resp_cookie(%__MODULE__{} = conn, key), do: delete_resp_cookie(conn, key, [])
+
+  def delete_resp_cookie(%__MODULE__{} = conn, key, opts),
+    do: %{conn | resp_cookies: Map.put(conn.resp_cookies, key, {:delete, opts})}
 end
 
 defmodule Phoenix.Controller do

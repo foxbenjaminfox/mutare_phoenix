@@ -16,7 +16,7 @@ into a located [Mutare](https://hex.pm/packages/mutare) survivor.
 | Family | Name | Mutation | The gap a survivor exposes |
 | --- | --- | --- | --- |
 | `Mutare.Phoenix.Plug` | `:plug_halt` | removes `Plug.Conn.halt/1` | no test depends on this plug *halting* — the classic authorization-bypass |
-| `Mutare.Phoenix.Response` | `:http_status` | swaps the atom status of `Plug.Conn.put_status/2`, `send_resp/3`, `resp/3`, `send_chunked/2`, and `send_file/3,5` for a same-family sibling (`:ok → :created`, `:unauthorized → :forbidden`) | no test pins the exact status |
+| `Mutare.Phoenix.Response` | `:http_status` | swaps the atom status of `Plug.Conn.put_status/2`, `send_resp/3`, `resp/3`, `send_chunked/2`, and `send_file/3,4,5` for a same-family sibling (`:ok → :created`, `:unauthorized → :forbidden`) | no test pins the exact status |
 | `Mutare.Phoenix.Redirect` | `:redirect_status` | swaps the explicit atom `status:` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling (`:found → :see_other`, `:moved_permanently → :permanent_redirect`) | no test pins the exact redirect status |
 | `Mutare.Phoenix.Session` | `:plug_session` | removes `Plug.Conn.put_session/3`, `delete_session/2`, and `clear_session/1` | no test depends on the session mutation |
 | `Mutare.Phoenix.Header` | `:resp_header` | removes `Plug.Conn.put_resp_header/3` and `delete_resp_header/2` | no test depends on the response header mutation |

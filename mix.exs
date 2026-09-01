@@ -1,7 +1,8 @@
-defmodule MutarePhoenix.MixProject do
+defmodule Mutare.Phoenix.MixProject do
   use Mix.Project
 
   @version "0.1.0"
+  @source_url "https://github.com/foxbenjaminfox/mutare_phoenix"
 
   def project do
     [
@@ -10,13 +11,11 @@ defmodule MutarePhoenix.MixProject do
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      description: description(),
+      package: package(),
       deps: deps(),
       aliases: aliases(),
       dialyzer: dialyzer(),
-      description: description(),
-      package: package(),
-      name: "Mutare Phoenix",
-      source_url: "https://github.com/foxbenjaminfox/mutare_phoenix",
       docs: docs()
     ]
   end
@@ -28,11 +27,33 @@ defmodule MutarePhoenix.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
+  defp description do
+    "Custom Mutare mutators for the Phoenix request surface — " <>
+      "the Plug.Conn / Phoenix.Controller calls a plug or controller action performs."
+  end
+
+  # Hex package metadata. The `mutare` core is still a `path:` dependency, so an
+  # actual `mix hex.publish` stays blocked until Mutare itself ships to Hex — this
+  # section keeps the manifest ready for that day. Only runtime and doc artifacts
+  # ship — never the test suite, fixtures, or the examples app.
+  defp package do
+    [
+      licenses: ["MIT"],
+      maintainers: ["Benjamin Fox"],
+      links: %{
+        "GitHub" => @source_url,
+        "Mutare" => "https://hexdocs.pm/mutare",
+        "Changelog" => "https://hexdocs.pm/mutare_phoenix/changelog.html"
+      },
+      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE)
+    ]
+  end
+
   defp deps do
     [
       # The host mutation-testing engine. `mutare_phoenix` implements
       # `Mutare.Mutator` / `Mutare.MacroRouting` and rides only its public extension
-      # points (`Mutare.Transform.Calls`, `Mutare.AST`). Tests use `Mutare.Test` and
+      # points (`Mutare.Calls`, `Mutare.AST`). Tests use `Mutare.Test` and
       # `Mutare.AST` for AST parse/render, so no direct `:sourceror` dep is needed.
       # A path dep for local development until `mutare` is published; a consuming
       # project depends on both as `:dev`/`:test` deps.
@@ -52,28 +73,32 @@ defmodule MutarePhoenix.MixProject do
     ]
   end
 
+  # ExDoc configuration. `mix docs` renders to `doc/` (gitignored). README is the
+  # landing page; `Mutare.Phoenix.ConnCall` is `@moduledoc false` plumbing and
+  # never appears.
   defp docs do
     [
       main: "readme",
+      source_url: @source_url,
+      source_ref: "v#{@version}",
       extras: ["README.md", "CHANGELOG.md", "LICENSE"],
-      source_ref: "v#{@version}"
+      groups_for_modules: [
+        "Mutator front": [Mutare.Phoenix],
+        "Mutator families": [
+          Mutare.Phoenix.Plug,
+          Mutare.Phoenix.Response,
+          Mutare.Phoenix.Redirect,
+          Mutare.Phoenix.Session,
+          Mutare.Phoenix.Header,
+          Mutare.Phoenix.Cookie
+        ]
+      ]
     ]
   end
 
+  # `mix check` is the single quality gate: formatting, lint, and type analysis.
+  # Any non-zero step aborts the rest, so a green run means all three passed.
   defp aliases do
     [check: ["format --check-formatted", "credo", "dialyzer"]]
-  end
-
-  defp description do
-    "Custom Mutare mutators for the Phoenix request surface — " <>
-      "the Plug.Conn / Phoenix.Controller calls a plug or controller action performs."
-  end
-
-  defp package do
-    [
-      licenses: ["MIT"],
-      links: %{"GitHub" => "https://github.com/foxbenjaminfox/mutare_phoenix"},
-      files: ~w(lib mix.exs README.md CHANGELOG.md .formatter.exs LICENSE)
-    ]
   end
 end

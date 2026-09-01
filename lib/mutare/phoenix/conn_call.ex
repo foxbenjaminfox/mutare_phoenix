@@ -1,11 +1,15 @@
 defmodule Mutare.Phoenix.ConnCall do
+  # The shared "remove a conn-transforming call" mutation for the removal families
+  # (`Plug`, `Session`, `Header`, `Cookie`): match a resolved call against a
+  # `{module, function, effective_arity}` set, then collapse it pipe-aware. Every
+  # removable call takes the conn as its first effective argument and returns the
+  # transformed conn, which is what makes both removal shapes compile-safe.
   @moduledoc false
 
   alias Mutare.AST
-  alias Mutare.Transform.Calls
+  alias Mutare.Calls
 
-  @typep module_key :: [atom()] | atom()
-  @typep removable_call :: {module_key(), atom(), arity()}
+  @typep removable_call :: {Calls.module_key(), atom(), arity()}
 
   @doc false
   @spec remove(
@@ -24,6 +28,10 @@ defmodule Mutare.Phoenix.ConnCall do
     end
   end
 
+  # A piped stage (`conn |> put_session(:k, v)`) becomes `Function.identity()` — the only
+  # compile-safe removal of a pipe stage. `absolute_call` emits the `Elixir.`-led alias,
+  # which alias resolution never rewrites, so the no-op always names the real
+  # `Function.identity/1`. A non-piped call collapses to its first argument, the conn.
   @doc false
   @spec removed_call(Mutare.Mutator.pipe_mode(), [Macro.t()]) :: :skip | [Macro.t()]
   def removed_call(:piped, _args), do: [AST.absolute_call([:Function], :identity, [])]

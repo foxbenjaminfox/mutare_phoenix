@@ -46,7 +46,7 @@ The package depends on **neither `phoenix` nor `plug`**. Mutators pattern-match 
 Registered in `lib/mutare/phoenix.ex` via `@families` / `all/0`:
 
 - `Mutare.Phoenix.Plug` — `:plug_halt`, removes `Plug.Conn.halt/1`.
-- `Mutare.Phoenix.Response` — `:http_status`, swaps an atom status of `put_status/2`, `send_resp/3`, `resp/3`, `send_chunked/2`, and `send_file/3,5` for a same-family sibling (curated `@status_swaps` table, per-instance configurable via `{module, swaps: %{...}}`).
+- `Mutare.Phoenix.Response` — `:http_status`, swaps an atom status of `put_status/2`, `send_resp/3`, `resp/3`, `send_chunked/2`, and `send_file/3,4,5` for a same-family sibling (curated `@status_swaps` table, per-instance configurable via `{module, swaps: %{...}}`).
 - `Mutare.Phoenix.Redirect` — `:redirect_status`, swaps explicit redirect `status:` atoms.
 - `Mutare.Phoenix.Session` — `:plug_session`, removes `put_session/3`, `delete_session/2`, and `clear_session/1`.
 - `Mutare.Phoenix.Header` — `:resp_header`, removes `put_resp_header/3` and `delete_resp_header/2`.
@@ -56,7 +56,7 @@ To add a family: implement the `Mutare.Mutator` behaviour, add the module to `@f
 
 ### Mutare extension points used
 
-- `Mutare.Transform.Calls.resolved_call(node)` → `{module_path, fun, args, rebuild}` — resolves direct/aliased/bare-imported call forms uniformly. The `rebuild` closure reconstructs the call from new args. This is the entry point in every family's `mutate`.
+- `Mutare.Calls.resolved_call(node)` → `{module_path, fun, args, rebuild}` — resolves direct/aliased/bare-imported call forms uniformly (the published facade; `Mutare.Transform.Calls` is core-internal). The `rebuild` closure reconstructs the call from new args. This is the entry point in every family's `mutate`.
 - `Mutare.Mutator` callbacks: `name/0` plus at least one producer — `mutate/1` and/or the context-aware `mutate/2`, both optional individually. Macro-argument routing lives on the separate `Mutare.MacroRouting` behaviour (`macro_routes/0`), which a mutator may also implement — listing it under `:mutators` auto-registers its routes.
 - `Mutare.AST` — `parse!`, `literal`, `key_atom` for AST construction/inspection.
 - `Mutare.Mutator.effective_arity/2` and `visible_index/2` — recover argument positions under pipe context.

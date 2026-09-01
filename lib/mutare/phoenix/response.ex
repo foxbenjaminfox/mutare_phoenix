@@ -53,7 +53,7 @@ defmodule Mutare.Phoenix.Response do
   @behaviour Mutare.MacroRouting
 
   alias Mutare.AST
-  alias Mutare.Transform.Calls
+  alias Mutare.Calls
 
   # A status-swap table: each reason atom mapped to its plausible same-family siblings.
   @typep swaps :: %{optional(atom()) => [atom()]}

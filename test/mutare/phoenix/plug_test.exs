@@ -48,6 +48,13 @@ defmodule Mutare.Phoenix.PlugTest do
       body = "  def call(conn, _o), do: conn |> halt() |> log()"
       assert halt_diffs(plug(body)) == [{"halt()", "Elixir.Function.identity()"}]
     end
+
+    test "a piped qualified Plug.Conn.halt() is also an identity stage" do
+      source = "defmodule P do\n  def call(conn, _o), do: conn |> Plug.Conn.halt()\nend\n"
+
+      assert halt_diffs(source) ==
+               [{"Plug.Conn.halt()", "Elixir.Function.identity()"}]
+    end
   end
 
   describe "scope" do

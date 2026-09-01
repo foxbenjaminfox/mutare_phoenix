@@ -28,7 +28,7 @@ defmodule Mutare.Phoenix.ResponseTest do
   # atom literals in `:__block__`, so this is the only way to reach the bare-atom fallbacks in
   # `status_atom/1` (the second clause) and `swap_status/2` (the `AST.literal/1` branch).
   defp bare_node_mutations(node, mutators) do
-    for {_spec, mutated, _note, _variant} <-
+    for %Dispatch.Result{node: mutated} <-
           Dispatch.mutations(node, List.wrap(mutators), %{pipe_mode: :unpiped}),
         do: Mutare.AST.to_string(mutated)
   end
@@ -58,6 +58,13 @@ defmodule Mutare.Phoenix.ResponseTest do
 
       assert status_diffs(source) ==
                [{"Plug.Conn.put_status(c, :unauthorized)", "Plug.Conn.put_status(c, :forbidden)"}]
+    end
+
+    test "a bare imported put_status(...) (use-style) swaps the atom status" do
+      source = controller("  def show(conn), do: put_status(conn, :unauthorized)")
+
+      assert status_diffs(source) ==
+               [{"put_status(conn, :unauthorized)", "put_status(conn, :forbidden)"}]
     end
 
     test "an aliased C.put_status(...) swaps the atom status" do
@@ -218,6 +225,13 @@ defmodule Mutare.Phoenix.ResponseTest do
 
       assert configured_diffs(source, swaps: %{ok: [:accepted]}) ==
                [{"Plug.Conn.put_status(c, :unauthorized)", "Plug.Conn.put_status(c, :forbidden)"}]
+    end
+
+    test "a malformed entry is dropped while well-formed entries still apply" do
+      # Per-entry filtering, not all-or-nothing: `bad: :nope` (siblings not a list) is
+      # ignored, while `ok: [:accepted]` still replaces the built-in siblings.
+      assert configured_diffs(@ok, swaps: %{ok: [:accepted], bad: :nope}) ==
+               [{"Plug.Conn.put_status(c, :ok)", "Plug.Conn.put_status(c, :accepted)"}]
     end
 
     test "a malformed :swaps option falls back to the built-in table" do

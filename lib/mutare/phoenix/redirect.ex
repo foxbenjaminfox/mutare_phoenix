@@ -14,7 +14,7 @@ defmodule Mutare.Phoenix.Redirect do
   @behaviour Mutare.Mutator
 
   alias Mutare.AST
-  alias Mutare.Transform.Calls
+  alias Mutare.Calls
 
   # The redirect status atoms Phoenix accepts in ordinary Location-based redirects, excluding
   # non-Location 3xx statuses such as :not_modified. Swaps stay within valid redirect statuses:

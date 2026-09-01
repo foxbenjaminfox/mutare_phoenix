@@ -46,7 +46,24 @@ defmodule Mutare.PhoenixTest do
                :resp_cookie
              ]
 
-      assert :literal in names and :atom in names
+      # Spot-check the expansion across the built-in categories: an operator family,
+      # and two of the per-kind value-literal families.
+      assert :arithmetic in names
+      assert :integer in names and :atom in names
+    end
+
+    test "a configured {module, opts} entry resolves under the same family name" do
+      mutators = List.replace_at(Mutare.Phoenix.all(), 1, {Mutare.Phoenix.Response, swaps: %{}})
+      specs = Mutare.Mutators.resolve(mutators)
+
+      assert Enum.map(specs, & &1.name) == [
+               :plug_halt,
+               :http_status,
+               :redirect_status,
+               :plug_session,
+               :resp_header,
+               :resp_cookie
+             ]
     end
   end
 

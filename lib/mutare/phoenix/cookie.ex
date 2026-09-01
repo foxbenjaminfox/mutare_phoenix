@@ -15,8 +15,8 @@ defmodule Mutare.Phoenix.Cookie do
   @behaviour Mutare.Mutator
 
   alias Mutare.AST
+  alias Mutare.Calls
   alias Mutare.Phoenix.ConnCall
-  alias Mutare.Transform.Calls
 
   @removable MapSet.new([
                {[:Plug, :Conn], :put_resp_cookie, 3},

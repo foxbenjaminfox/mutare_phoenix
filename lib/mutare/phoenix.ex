@@ -13,7 +13,7 @@ defmodule Mutare.Phoenix do
       # .mutare.exs
       [mutators: [:builtins] ++ Mutare.Phoenix.all()]
 
-  `all/0` returns this package's six families:
+  `all/0` returns this package's seven families:
 
     * `Mutare.Phoenix.Plug` — `:plug_halt`, removes `Plug.Conn.halt/1`.
     * `Mutare.Phoenix.Response` — `:http_status`, swaps the atom status of
@@ -21,10 +21,14 @@ defmodule Mutare.Phoenix do
       `send_file/3,4,5` for a same-family sibling.
     * `Mutare.Phoenix.Redirect` — `:redirect_status`, swaps the explicit atom
       `:status` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling.
-    * `Mutare.Phoenix.Session` — `:plug_session`, removes session mutations.
-    * `Mutare.Phoenix.Header` — `:resp_header`, removes response-header mutations.
-    * `Mutare.Phoenix.Cookie` — `:resp_cookie`, removes response-cookie mutations and
-      flips explicit `:same_site` values.
+    * `Mutare.Phoenix.Session` — `:plug_session`, removes session mutations,
+      `configure_session/2` included.
+    * `Mutare.Phoenix.Header` — `:resp_header`, removes response-header mutations,
+      `put_resp_content_type/2,3` included.
+    * `Mutare.Phoenix.Cookie` — `:resp_cookie`, removes response-cookie mutations,
+      flips explicit `:same_site` values, and drops explicit `:max_age` options.
+    * `Mutare.Phoenix.Body` — `:resp_body`, blanks the body of `Plug.Conn.send_resp/3`
+      and `resp/3` to `""`.
 
   Each family matches its call written directly (`Plug.Conn.halt(conn)`), aliased, or
   bare-imported (`halt(conn)`, the form `use MyAppWeb, :controller` produces).
@@ -45,11 +49,12 @@ defmodule Mutare.Phoenix do
     Mutare.Phoenix.Redirect,
     Mutare.Phoenix.Session,
     Mutare.Phoenix.Header,
-    Mutare.Phoenix.Cookie
+    Mutare.Phoenix.Cookie,
+    Mutare.Phoenix.Body
   ]
 
   @doc """
-  This package's six mutator families, for splicing into `:mutators` (see the module
+  This package's seven mutator families, for splicing into `:mutators` (see the module
   docs for the `:builtins` pairing).
 
       iex> Mutare.Phoenix.all() == [
@@ -58,7 +63,8 @@ defmodule Mutare.Phoenix do
       ...>   Mutare.Phoenix.Redirect,
       ...>   Mutare.Phoenix.Session,
       ...>   Mutare.Phoenix.Header,
-      ...>   Mutare.Phoenix.Cookie
+      ...>   Mutare.Phoenix.Cookie,
+      ...>   Mutare.Phoenix.Body
       ...> ]
       true
   """

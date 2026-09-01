@@ -1,7 +1,7 @@
 defmodule Mutare.Phoenix.HeaderTest do
   @moduledoc """
-  `:resp_header` — removes `Plug.Conn.put_resp_header/3` and
-  `delete_resp_header/2`, pipe-aware.
+  `:resp_header` — removes `Plug.Conn.put_resp_header/3`, `delete_resp_header/2`, and
+  `put_resp_content_type/2,3`, pipe-aware.
   """
   use ExUnit.Case, async: true
 
@@ -38,6 +38,30 @@ defmodule Mutare.Phoenix.HeaderTest do
              ]
     end
 
+    test "qualified put_resp_content_type/2 collapses to the conn" do
+      source = """
+      defmodule P do
+        def call(conn), do: Plug.Conn.put_resp_content_type(conn, "application/json")
+      end
+      """
+
+      assert header_diffs(source) == [
+               {"Plug.Conn.put_resp_content_type(conn, \"application/json\")", "conn"}
+             ]
+    end
+
+    test "qualified put_resp_content_type/3 with a charset collapses to the conn" do
+      source = """
+      defmodule P do
+        def call(conn), do: Plug.Conn.put_resp_content_type(conn, "text/html", "latin1")
+      end
+      """
+
+      assert header_diffs(source) == [
+               {"Plug.Conn.put_resp_content_type(conn, \"text/html\", \"latin1\")", "conn"}
+             ]
+    end
+
     test "bare imported and aliased calls are recognised" do
       imported = plug(~s/  def call(conn), do: put_resp_header(conn, "x-a", "1")/)
 
@@ -65,24 +89,32 @@ defmodule Mutare.Phoenix.HeaderTest do
                {"delete_resp_header(\"x-a\")", "Elixir.Function.identity()"}
              ]
     end
+
+    test "piped put_resp_content_type/2 becomes an identity stage" do
+      source = plug(~s/  def call(conn), do: conn |> put_resp_content_type("text\/plain")/)
+
+      assert header_diffs(source) == [
+               {"put_resp_content_type(\"text/plain\")", "Elixir.Function.identity()"}
+             ]
+    end
   end
 
   describe "scope" do
-    test "wrong arities and other header helpers are left alone" do
+    test "wrong arities and header readers are left alone" do
       wrong_arity = """
       defmodule P do
         def call(conn), do: Plug.Conn.put_resp_header(conn, "x-a")
       end
       """
 
-      content_type = """
+      reader = """
       defmodule P do
-        def call(conn), do: Plug.Conn.put_resp_content_type(conn, "application/json")
+        def call(conn), do: Plug.Conn.get_resp_header(conn, "x-a")
       end
       """
 
       assert header_diffs(wrong_arity) == []
-      assert header_diffs(content_type) == []
+      assert header_diffs(reader) == []
     end
   end
 
@@ -102,6 +134,8 @@ defmodule Mutare.Phoenix.HeaderTest do
       def call(conn) do
         conn
         |> put_resp_header("cache-control", "no-store")
+        |> put_resp_content_type("application/json")
+        |> put_resp_content_type("text/html", "latin1")
         |> delete_resp_header("x-legacy")
       end
     end

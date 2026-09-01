@@ -82,6 +82,10 @@ defmodule Mutare.Phoenix.MixProject do
       source_url: @source_url,
       source_ref: "v#{@version}",
       extras: ["README.md", "CHANGELOG.md", "LICENSE"],
+      # `Mutare.Phoenix.Body`'s moduledoc names core's hidden overlap pass in prose
+      # (the reference is worth keeping — it explains the literal-body supersession);
+      # don't autolink to it, which also silences the "references hidden" warning.
+      skip_code_autolink_to: ["Mutare.Transform.Overlap"],
       groups_for_modules: [
         "Mutator front": [Mutare.Phoenix],
         "Mutator families": [
@@ -90,7 +94,8 @@ defmodule Mutare.Phoenix.MixProject do
           Mutare.Phoenix.Redirect,
           Mutare.Phoenix.Session,
           Mutare.Phoenix.Header,
-          Mutare.Phoenix.Cookie
+          Mutare.Phoenix.Cookie,
+          Mutare.Phoenix.Body
         ]
       ]
     ]

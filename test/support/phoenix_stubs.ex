@@ -27,6 +27,9 @@ defmodule Plug.Conn do
   def put_resp_content_type(%__MODULE__{} = conn, type),
     do: %{conn | resp_headers: [{"content-type", type} | conn.resp_headers]}
 
+  def put_resp_content_type(%__MODULE__{} = conn, type, charset),
+    do: put_resp_content_type(conn, "#{type}; charset=#{charset}")
+
   def send_resp(%__MODULE__{} = conn, status, body),
     do: %{conn | status: status, resp_body: body}
 
@@ -51,6 +54,8 @@ defmodule Plug.Conn do
     do: assign(conn, :session, Map.delete(Map.get(conn.assigns, :session, %{}), key))
 
   def clear_session(%__MODULE__{} = conn), do: assign(conn, :session, %{})
+
+  def configure_session(%__MODULE__{} = conn, _opts), do: conn
 
   def delete_resp_header(%__MODULE__{} = conn, key),
     do: %{conn | resp_headers: List.keydelete(conn.resp_headers, key, 0)}

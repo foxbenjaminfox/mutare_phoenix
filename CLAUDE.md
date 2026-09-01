@@ -48,9 +48,10 @@ Registered in `lib/mutare/phoenix.ex` via `@families` / `all/0`:
 - `Mutare.Phoenix.Plug` — `:plug_halt`, removes `Plug.Conn.halt/1`.
 - `Mutare.Phoenix.Response` — `:http_status`, swaps an atom status of `put_status/2`, `send_resp/3`, `resp/3`, `send_chunked/2`, and `send_file/3,4,5` for a same-family sibling (curated `@status_swaps` table, per-instance configurable via `{module, swaps: %{...}}`).
 - `Mutare.Phoenix.Redirect` — `:redirect_status`, swaps explicit redirect `status:` atoms.
-- `Mutare.Phoenix.Session` — `:plug_session`, removes `put_session/3`, `delete_session/2`, and `clear_session/1`.
-- `Mutare.Phoenix.Header` — `:resp_header`, removes `put_resp_header/3` and `delete_resp_header/2`.
-- `Mutare.Phoenix.Cookie` — `:resp_cookie`, removes `put_resp_cookie/3,4` and `delete_resp_cookie/2,3`, plus flips/drops explicit string `same_site:` options.
+- `Mutare.Phoenix.Session` — `:plug_session`, removes `put_session/3`, `delete_session/2`, `clear_session/1`, and `configure_session/2` (the session-fixation bypass).
+- `Mutare.Phoenix.Header` — `:resp_header`, removes `put_resp_header/3`, `delete_resp_header/2`, and `put_resp_content_type/2,3`.
+- `Mutare.Phoenix.Cookie` — `:resp_cookie`, removes `put_resp_cookie/3,4` and `delete_resp_cookie/2,3`, flips/drops explicit string `same_site:` options, and drops `max_age:` on `put_resp_cookie/4` (persistent → session cookie; a presence mutation the built-in integer family can't mint).
+- `Mutare.Phoenix.Body` — `:resp_body`, blanks the body of `send_resp/3` and `resp/3` to `""`; its single-argument rewrite is an Overlap-covering mutation, so the built-in `:string` leaves on a literal body are pruned automatically.
 
 To add a family: implement the `Mutare.Mutator` behaviour, add the module to `@families`, and add a test module mirroring the existing ones.
 
@@ -71,7 +72,7 @@ To add a family: implement the `Mutare.Mutator` behaviour, add the module to `@f
 ### Recurring AST conventions (apply to any new family)
 
 - **Clean-meta rule:** to change a *value* in place, keep the original node's Sourceror metadata (so it re-renders inline); only use fresh meta (e.g. `[format: :keyword]`) for genuinely new nodes. Carrying stale line metadata makes Sourceror expand calls across lines. See `swap_status/2`.
-- **Valid-but-wrong swaps + Overlap pruning:** families swap to *valid* siblings (not crashing values). Because they touch the exact same AST range as Mutare's built-in atom mutators (`:mutare`, `:error`), `Mutare.Transform.Overlap` auto-prunes the redundant crashing leaves — no declaration needed. Tests assert this (the "superseding" describe blocks).
+- **Valid-but-wrong swaps + Overlap pruning:** families swap to *valid* siblings (not crashing values). Because a single-argument rewrite touches the exact same AST node as Mutare's built-in leaf mutators — the atom families' `:mutare`/`:error` under `:http_status`, the `:string` `""`/`"mutare"` under `:resp_body` — `Mutare.Transform.Overlap` auto-prunes the redundant leaves — no declaration needed. Tests assert this (the "superseding" describe blocks). The rewrite must substitute exactly one node and keep the call form otherwise identical (bare imported calls stay bare); a requalified or multi-node change loses the covering footprint and the leaves resurface.
 - **`macro_routes/0` `:skip` registration:** `Response` implements `Mutare.MacroRouting` and its `macro_routes/0` registers the `Phoenix.Router` DSL (`get`/`scope`/…) as `:skip` so Mutare leaves compile-time route definitions unmutated.
 - **Consumer-side silencing:** a deliberate site in a host project is silenced with a family-scoped `# mutare:ignore[<family>]` comment (e.g. `# mutare:ignore[http_status]`) — an engine feature (`Mutare.Ignore`), not something this package implements, but the family names this package records (`:plug_halt`, `:http_status`, `:plug_session`, etc.) are what users put in the brackets.
 

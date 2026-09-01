@@ -13,14 +13,15 @@ defmodule Mutare.PhoenixTest do
   doctest Mutare.Phoenix
 
   describe "all/0" do
-    test "is the six families in order" do
+    test "is the seven families in order" do
       assert Mutare.Phoenix.all() == [
                Mutare.Phoenix.Plug,
                Mutare.Phoenix.Response,
                Mutare.Phoenix.Redirect,
                Mutare.Phoenix.Session,
                Mutare.Phoenix.Header,
-               Mutare.Phoenix.Cookie
+               Mutare.Phoenix.Cookie,
+               Mutare.Phoenix.Body
              ]
     end
 
@@ -37,13 +38,14 @@ defmodule Mutare.PhoenixTest do
       specs = Mutare.Mutators.resolve([:builtins] ++ Mutare.Phoenix.all())
       names = Enum.map(specs, & &1.name)
 
-      assert Enum.take(names, -6) == [
+      assert Enum.take(names, -7) == [
                :plug_halt,
                :http_status,
                :redirect_status,
                :plug_session,
                :resp_header,
-               :resp_cookie
+               :resp_cookie,
+               :resp_body
              ]
 
       # Spot-check the expansion across the built-in categories: an operator family,
@@ -62,7 +64,8 @@ defmodule Mutare.PhoenixTest do
                :redirect_status,
                :plug_session,
                :resp_header,
-               :resp_cookie
+               :resp_cookie,
+               :resp_body
              ]
     end
   end
@@ -91,6 +94,10 @@ defmodule Mutare.PhoenixTest do
         |> put_resp_cookie("blocked", "true", same_site: "Strict")
         |> halt()
       end
+
+      def health(conn, _params) do
+        send_resp(conn, 200, "ok")
+      end
     end
     """
 
@@ -107,6 +114,7 @@ defmodule Mutare.PhoenixTest do
                :plug_halt,
                :plug_session,
                :redirect_status,
+               :resp_body,
                :resp_cookie,
                :resp_header
              ]

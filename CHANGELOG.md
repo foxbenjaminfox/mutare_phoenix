@@ -21,12 +21,19 @@ Initial release.
   `status:` options on `Phoenix.Controller.redirect/2` among valid redirect
   status siblings.
 - `Mutare.Phoenix.Session` (`:plug_session`) — removes `Plug.Conn.put_session/3`,
-  `delete_session/2`, and `clear_session/1`.
-- `Mutare.Phoenix.Header` (`:resp_header`) — removes `Plug.Conn.put_resp_header/3`
-  and `delete_resp_header/2`.
+  `delete_session/2`, `clear_session/1`, and `configure_session/2` (removing
+  `configure_session(conn, renew: true)` on login is the classic
+  session-fixation bypass).
+- `Mutare.Phoenix.Header` (`:resp_header`) — removes `Plug.Conn.put_resp_header/3`,
+  `delete_resp_header/2`, and `put_resp_content_type/2,3`.
 - `Mutare.Phoenix.Cookie` (`:resp_cookie`) — removes `Plug.Conn.put_resp_cookie/3,4`
-  and `delete_resp_cookie/2,3`, plus flipping/dropping explicit string
-  `same_site:` cookie policy options.
+  and `delete_resp_cookie/2,3`, flips/drops explicit string `same_site:` cookie
+  policy options, and drops the `max_age:` option of `put_resp_cookie/4`
+  (persistent cookie → session cookie).
+- `Mutare.Phoenix.Body` (`:resp_body`) — blanks the body argument of
+  `Plug.Conn.send_resp/3` and `resp/3` to `""` ("does any test read the
+  response body?"); on a literal body its whole-call rewrite supersedes the
+  built-in string family's sentinel leaves via Mutare's overlap pruning.
 - Registers the `Phoenix.Router` DSL (`get`/`scope`/…) as `:skip` through
   `Mutare.MacroRouting`, so compile-time route definitions are left unmutated,
   and `Phoenix.Component.sigil_H/2` (`~H`) arguments as compile-time literals,

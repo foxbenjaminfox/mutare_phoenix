@@ -1,16 +1,24 @@
 defmodule Mutare.Phoenix.Cookie do
   @moduledoc """
-  `:resp_cookie` — removes response-cookie mutations and flips explicit `:same_site`
-  cookie policy values. A survivor means no test depends on this code setting/deleting the
-  response cookie, or on the cookie's SameSite policy.
+  `:resp_cookie` — removes response-cookie mutations, flips explicit `:same_site`
+  cookie policy values, and drops explicit `:max_age` options. A survivor means no test
+  depends on this code setting/deleting the response cookie, on the cookie's SameSite
+  policy, or on its persistence.
 
       put_resp_cookie(conn, "sid", token)                    # → conn
       delete_resp_cookie(conn, "sid")                        # → conn
       put_resp_cookie(conn, "sid", token, same_site: "Lax")  # → "Strict" / "None"
+      put_resp_cookie(conn, "sid", token, max_age: ttl)      # → put_resp_cookie(conn, "sid", token)
+
+  Dropping `max_age:` turns a persistent cookie into a session cookie — an option-*presence*
+  mutation the built-in literal families cannot produce (they mutate the duration's value,
+  not the entry). It applies only to `put_resp_cookie/4`; `delete_resp_cookie/3` forces
+  `max_age: 0` regardless of the option, so a drop there would be a no-op mutant.
 
   Matches `Plug.Conn.put_resp_cookie/3,4` and `Plug.Conn.delete_resp_cookie/2,3`
   written directly, aliased, or bare-imported. Boolean-valued cookie options such as
-  `:secure` and `:http_only` are left to Mutare's built-in boolean mutators.
+  `:secure`, `:http_only`, `:sign`, and `:encrypt` are left to Mutare's built-in boolean
+  mutators (dropping one is equivalent to flipping it to its default).
   """
   @behaviour Mutare.Mutator
 
@@ -28,7 +36,7 @@ defmodule Mutare.Phoenix.Cookie do
   # The options argument for the arity-carrying forms:
   #   put_resp_cookie(conn, key, value, opts) => effective option index 3
   #   delete_resp_cookie(conn, key, opts)     => effective option index 2
-  @same_site_calls %{
+  @option_calls %{
     put_resp_cookie: {4, 3},
     delete_resp_cookie: {3, 2}
   }
@@ -49,47 +57,46 @@ defmodule Mutare.Phoenix.Cookie do
   def mutate(node, %{pipe_mode: pipe_mode}) do
     combine_mutations(
       ConnCall.remove(node, pipe_mode, @removable),
-      same_site_mutations(node, pipe_mode)
+      option_mutations(node, pipe_mode)
     )
   end
 
-  defp same_site_mutations(node, pipe_mode) do
+  defp option_mutations(node, pipe_mode) do
     case Calls.resolved_call(node) do
-      {[:Plug, :Conn], call, args, rebuild} when is_map_key(@same_site_calls, call) ->
-        same_site_mutations(call, args, pipe_mode, rebuild)
+      {[:Plug, :Conn], call, args, rebuild} when is_map_key(@option_calls, call) ->
+        option_mutations(call, args, pipe_mode, rebuild)
 
       _other ->
         :skip
     end
   end
 
-  defp same_site_mutations(call, args, pipe_mode, rebuild) do
-    {expected_arity, option_index} = Map.fetch!(@same_site_calls, call)
+  defp option_mutations(call, args, pipe_mode, rebuild) do
+    {expected_arity, option_index} = Map.fetch!(@option_calls, call)
 
     with ^expected_arity <- Mutare.Mutator.effective_arity(args, pipe_mode),
          vis when is_integer(vis) <- Mutare.Mutator.visible_index(option_index, pipe_mode),
-         [_ | _] = options <- same_site_option_mutations(Enum.at(args, vis), args, vis) do
+         [_ | _] = options <- keyword_option_mutations(call, Enum.at(args, vis), args, vis) do
       Enum.map(options, fn mutated_args -> rebuild.(call, mutated_args) end)
     else
       _other -> :skip
     end
   end
 
-  defp same_site_option_mutations(arg, args, option_visible_index) do
+  defp keyword_option_mutations(call, arg, args, option_visible_index) do
     case keyword_list(arg) do
       nil ->
         []
 
       {pairs, rewrap} ->
         for {{key, value}, i} <- Enum.with_index(pairs),
-            AST.key_atom(key) == :same_site,
-            current <- same_site_value(value),
             mutation <-
-              same_site_pair_mutations(
+              pair_mutations(
+                call,
+                AST.key_atom(key),
                 pairs,
                 i,
                 value,
-                current,
                 rewrap,
                 args,
                 option_visible_index
@@ -98,6 +105,23 @@ defmodule Mutare.Phoenix.Cookie do
         end
     end
   end
+
+  # The per-key option mutations, in pair order: the `:same_site` drop + flips (both
+  # option-carrying calls), and the `:max_age` drop (`put_resp_cookie/4` only —
+  # `delete_resp_cookie/3` forces `max_age: 0` regardless, so a drop there is a no-op).
+  # The `:max_age` drop fires whatever the value node is (literal or dynamic): it mutates
+  # the option's *presence*, so the current value never matters.
+  defp pair_mutations(_call, :same_site, pairs, i, value, rewrap, args, option_visible_index) do
+    for current <- same_site_value(value),
+        mutation <-
+          same_site_pair_mutations(pairs, i, value, current, rewrap, args, option_visible_index),
+        do: mutation
+  end
+
+  defp pair_mutations(:put_resp_cookie, :max_age, pairs, i, _value, rewrap, args, vis),
+    do: drop_pair(pairs, i, rewrap, args, vis)
+
+  defp pair_mutations(_call, _key, _pairs, _i, _value, _rewrap, _args, _vis), do: []
 
   defp same_site_pair_mutations(pairs, index, value, current, rewrap, args, option_visible_index) do
     maybe_drop_same_site(pairs, index, current, rewrap, args, option_visible_index) ++
@@ -108,7 +132,13 @@ defmodule Mutare.Phoenix.Cookie do
   # explicit policy when the written value differs from that default.
   defp maybe_drop_same_site(_pairs, _index, "Lax", _rewrap, _args, _option_visible_index), do: []
 
-  defp maybe_drop_same_site(pairs, index, _current, rewrap, args, option_visible_index) do
+  defp maybe_drop_same_site(pairs, index, _current, rewrap, args, option_visible_index),
+    do: drop_pair(pairs, index, rewrap, args, option_visible_index)
+
+  # Remove one keyword pair; when it was the last, drop the whole options argument down an
+  # arity (`put_resp_cookie(conn, "sid", token, max_age: ttl)` → `/3`) rather than leave a
+  # dangling `[]`.
+  defp drop_pair(pairs, index, rewrap, args, option_visible_index) do
     case List.delete_at(pairs, index) do
       [] -> [List.delete_at(args, option_visible_index)]
       remaining -> [List.replace_at(args, option_visible_index, rewrap.(remaining))]

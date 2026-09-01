@@ -1,7 +1,7 @@
 defmodule Mutare.Phoenix.SessionTest do
   @moduledoc """
-  `:plug_session` — removes `Plug.Conn.put_session/3`, `delete_session/2`, and
-  `clear_session/1`, pipe-aware.
+  `:plug_session` — removes `Plug.Conn.put_session/3`, `delete_session/2`,
+  `clear_session/1`, and `configure_session/2`, pipe-aware.
   """
   use ExUnit.Case, async: true
 
@@ -44,6 +44,18 @@ defmodule Mutare.Phoenix.SessionTest do
       assert session_diffs(source) == [{"Plug.Conn.clear_session(conn)", "conn"}]
     end
 
+    test "qualified configure_session/2 collapses to the conn — the session-fixation bypass" do
+      source = """
+      defmodule P do
+        def call(conn), do: Plug.Conn.configure_session(conn, renew: true)
+      end
+      """
+
+      assert session_diffs(source) == [
+               {"Plug.Conn.configure_session(conn, renew: true)", "conn"}
+             ]
+    end
+
     test "bare imported put_session/3 is recognised" do
       assert session_diffs(plug("  def call(conn), do: put_session(conn, :user_id, 1)")) ==
                [{"put_session(conn, :user_id, 1)", "conn"}]
@@ -75,24 +87,32 @@ defmodule Mutare.Phoenix.SessionTest do
 
       assert session_diffs(source) == [{"clear_session()", "Elixir.Function.identity()"}]
     end
+
+    test "piped configure_session/2 becomes an identity stage" do
+      source = plug("  def call(conn), do: conn |> configure_session(drop: true)")
+
+      assert session_diffs(source) == [
+               {"configure_session(drop: true)", "Elixir.Function.identity()"}
+             ]
+    end
   end
 
   describe "scope" do
-    test "wrong arities and non-session Plug.Conn calls are left alone" do
+    test "wrong arities and non-mutating Plug.Conn calls are left alone" do
       wrong_arity = """
       defmodule P do
         def call(conn), do: Plug.Conn.put_session(conn, :user_id)
       end
       """
 
-      non_session = """
+      non_mutating = """
       defmodule P do
-        def call(conn), do: Plug.Conn.configure_session(conn, renew: true)
+        def call(conn), do: Plug.Conn.get_session(conn, :user_id)
       end
       """
 
       assert session_diffs(wrong_arity) == []
-      assert session_diffs(non_session) == []
+      assert session_diffs(non_mutating) == []
     end
   end
 
@@ -111,6 +131,7 @@ defmodule Mutare.Phoenix.SessionTest do
         conn
         |> put_session(:user_id, 1)
         |> delete_session(:legacy)
+        |> configure_session(renew: true)
         |> clear_session()
       end
     end

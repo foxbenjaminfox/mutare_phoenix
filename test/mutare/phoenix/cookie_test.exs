@@ -1,7 +1,8 @@
 defmodule Mutare.Phoenix.CookieTest do
   @moduledoc """
   `:resp_cookie` — removes `Plug.Conn.put_resp_cookie/3,4` and
-  `delete_resp_cookie/2,3`, and flips explicit string `:same_site` values.
+  `delete_resp_cookie/2,3`, flips explicit string `:same_site` values, and drops the
+  `:max_age` option of `put_resp_cookie/4`.
   """
   use ExUnit.Case, async: true
 
@@ -180,6 +181,103 @@ defmodule Mutare.Phoenix.CookieTest do
     end
   end
 
+  describe "max_age option drop" do
+    test "put_resp_cookie/4 drops max_age, turning a persistent cookie into a session cookie" do
+      source = """
+      defmodule P do
+        def call(conn, token) do
+          Plug.Conn.put_resp_cookie(conn, "sid", token, max_age: 3600)
+        end
+      end
+      """
+
+      assert cookie_diffs(source) == [
+               {"Plug.Conn.put_resp_cookie(conn, \"sid\", token, max_age: 3600)", "conn"},
+               {"Plug.Conn.put_resp_cookie(conn, \"sid\", token, max_age: 3600)",
+                "Plug.Conn.put_resp_cookie(conn, \"sid\", token)"}
+             ]
+    end
+
+    test "other options are kept when dropping max_age" do
+      source = """
+      defmodule P do
+        def call(conn, token) do
+          Plug.Conn.put_resp_cookie(conn, "sid", token, max_age: 3600, path: "/")
+        end
+      end
+      """
+
+      assert cookie_diffs(source) == [
+               {"Plug.Conn.put_resp_cookie(conn, \"sid\", token, max_age: 3600, path: \"/\")",
+                "conn"},
+               {"Plug.Conn.put_resp_cookie(conn, \"sid\", token, max_age: 3600, path: \"/\")",
+                "Plug.Conn.put_resp_cookie(conn, \"sid\", token, path: \"/\")"}
+             ]
+    end
+
+    test "a dynamic max_age value is dropped too — the mutation is the option's presence" do
+      source = """
+      defmodule P do
+        def call(conn, token, ttl) do
+          Plug.Conn.put_resp_cookie(conn, "sid", token, max_age: ttl)
+        end
+      end
+      """
+
+      assert cookie_diffs(source) == [
+               {"Plug.Conn.put_resp_cookie(conn, \"sid\", token, max_age: ttl)", "conn"},
+               {"Plug.Conn.put_resp_cookie(conn, \"sid\", token, max_age: ttl)",
+                "Plug.Conn.put_resp_cookie(conn, \"sid\", token)"}
+             ]
+    end
+
+    test "piped put_resp_cookie/4 drops max_age at the visible options argument" do
+      source =
+        plug(~s/  def call(conn, token), do: conn |> put_resp_cookie("sid", token, max_age: 60)/)
+
+      assert cookie_diffs(source) == [
+               {"put_resp_cookie(\"sid\", token, max_age: 60)", "Elixir.Function.identity()"},
+               {"put_resp_cookie(\"sid\", token, max_age: 60)", "put_resp_cookie(\"sid\", token)"}
+             ]
+    end
+
+    test "same_site and max_age mutations combine in pair order" do
+      source = """
+      defmodule P do
+        def call(conn, token) do
+          Plug.Conn.put_resp_cookie(conn, "sid", token, same_site: "Strict", max_age: 60)
+        end
+      end
+      """
+
+      original =
+        "Plug.Conn.put_resp_cookie(conn, \"sid\", token, same_site: \"Strict\", max_age: 60)"
+
+      assert cookie_diffs(source) == [
+               {original, "conn"},
+               {original, "Plug.Conn.put_resp_cookie(conn, \"sid\", token, max_age: 60)"},
+               {original,
+                "Plug.Conn.put_resp_cookie(conn, \"sid\", token, same_site: \"Lax\", max_age: 60)"},
+               {original,
+                "Plug.Conn.put_resp_cookie(conn, \"sid\", token, same_site: \"None\", max_age: 60)"},
+               {original,
+                "Plug.Conn.put_resp_cookie(conn, \"sid\", token, same_site: \"Strict\")"}
+             ]
+    end
+
+    test "delete_resp_cookie/3 max_age is left alone — Plug forces max_age: 0 there anyway" do
+      source = """
+      defmodule P do
+        def call(conn), do: Plug.Conn.delete_resp_cookie(conn, "sid", max_age: 0)
+      end
+      """
+
+      assert cookie_diffs(source) == [
+               {"Plug.Conn.delete_resp_cookie(conn, \"sid\", max_age: 0)", "conn"}
+             ]
+    end
+  end
+
   describe "scope" do
     test "wrong arities and dynamic same_site values contribute only valid call removals" do
       wrong_arity = """
@@ -219,7 +317,8 @@ defmodule Mutare.Phoenix.CookieTest do
 
       def call(conn, token) do
         conn
-        |> put_resp_cookie("sid", token, same_site: "Strict")
+        |> put_resp_cookie("sid", token, same_site: "Strict", max_age: 3600)
+        |> put_resp_cookie("theme", "dark", max_age: 60)
         |> delete_resp_cookie("old", same_site: "None")
       end
     end

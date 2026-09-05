@@ -24,9 +24,9 @@ families (`:plug_halt`, `:http_status`, `:plug_session`, `:resp_header`,
 - `Mutare.Phoenix.Download` (`:download_disposition`) — flips the explicit
   `disposition:` option of `Phoenix.Controller.send_download/3` between
   `:attachment` and `:inline`.
-- `Mutare.Phoenix` as a `Mutare.MacroRouting` extension (list it under
-  `:extensions`): registers the `Phoenix.Router` DSL (`get`/`scope`/…) as
-  `:skip`, so compile-time route definitions are left unmutated, and
+- `Mutare.Phoenix` as a `Mutare.CallRouting` extension (list it under
+  `:extensions`): routes the `Phoenix.Router` DSL (`get`/`scope`/…) `:skip`,
+  so compile-time route definitions are left unmutated, and
   `Phoenix.Component.sigil_H/2` (`~H`) arguments as compile-time literals, so
   HEEx never poisons the metamutant build.
 - `Mutare.Phoenix.all/0` for splicing the Phoenix families into a `:mutators`

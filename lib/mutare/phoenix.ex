@@ -38,9 +38,9 @@ defmodule Mutare.Phoenix do
 
   ## The `:extensions` entry
 
-  This module is also a `Mutare.MacroRouting` extension. Listed under `:extensions`, it
-  registers Phoenix's compile-time-only macros as `:skip`, so Mutare leaves their arguments
-  unmutated:
+  This module is also a `Mutare.CallRouting` extension. Listed under `:extensions`, it
+  routes Phoenix's compile-time-only macro calls `:skip` — the whole call is an inert leaf, so
+  Mutare neither descends into their arguments nor rewrites the calls themselves:
 
     * the `Phoenix.Router` DSL (`get`/`post`/`scope`/…), because route definitions run once
       at compile time under Mutare's compile-once model — a mutation there could never
@@ -53,7 +53,7 @@ defmodule Mutare.Phoenix do
   Mutations *around* a `~H` expression (for example a `render/1` `:return_value` mutant)
   remain available; only the sigil's own arguments are opaque.
   """
-  @behaviour Mutare.MacroRouting
+  @behaviour Mutare.CallRouting
 
   # Mutators pattern-match module *names* (`Phoenix.Controller`, `Phoenix.Router`,
   # `Phoenix.Component`), so this package depends on neither `phoenix` nor `plug` —
@@ -84,9 +84,9 @@ defmodule Mutare.Phoenix do
   # `~H` compiles to `Phoenix.Component.sigil_H/2`, whose arguments must stay literal.
   # Leaving it unregistered lets Mutare's imported-call witness generate an unreachable
   # `sigil_H(arg1, arg2)`; macros still expand in unreachable code, so Phoenix raises before
-  # poison recovery can identify a single mutant. Routing both arguments `:skip` drops that
+  # poison recovery can identify a single mutant. Skipping the call (`:skip`) drops that
   # witness and keeps the sigil payload opaque while mutations around the whole expression
-  # (for example `:return_value`) remain available.
+  # (for example `:return_value`, which belongs to the enclosing function) remain available.
   @component_macros [{Phoenix.Component, :sigil_H, 2, :skip}]
 
   @doc """
@@ -103,9 +103,9 @@ defmodule Mutare.Phoenix do
   # mutant 0, so route/verb/pipeline mutations can never activate under Mutare's compile-once
   # model. Skipping the DSL keeps core from wasting mutant ids on it. Plug *function* bodies
   # (`def call/2`) and controller actions are ordinary runtime code and are still mutated.
-  @impl Mutare.MacroRouting
-  @spec macro_routes() :: [Mutare.MacroRouting.route()]
-  def macro_routes do
+  @impl Mutare.CallRouting
+  @spec call_routes() :: [Mutare.CallRouting.route()]
+  def call_routes do
     Enum.map(@router_macros, &{Phoenix.Router, &1, :any, :skip}) ++ @component_macros
   end
 end

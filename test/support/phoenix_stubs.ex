@@ -81,7 +81,7 @@ end
 
 defmodule Phoenix.Router do
   @moduledoc false
-  # Only needs to *exist* as a module-key target for the `macro_routes/0` `:skip` registration
+  # Only needs to *exist* as a module-key target for the `call_routes/0` `:skip` registration
   # test; the registration is purely syntactic, so no DSL macros are required here.
 end
 

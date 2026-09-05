@@ -38,9 +38,9 @@ The `Plug.Conn` side of a controller action — `put_status`, `send_resp`, `put_
 
 ## The `:extensions` entry
 
-`Mutare.Phoenix` is also a `Mutare.MacroRouting` extension. Listed under `:extensions`, it
-registers Phoenix's compile-time-only macros as `:skip`, so their arguments are left
-unmutated: the `Phoenix.Router` DSL (`get`/`post`/`scope`/…), because route definitions run
+`Mutare.Phoenix` is also a `Mutare.CallRouting` extension. Listed under `:extensions`, it
+routes Phoenix's compile-time-only macro calls `:skip` — each call is an inert leaf, so
+neither its arguments nor the call itself is ever mutated: the `Phoenix.Router` DSL (`get`/`post`/`scope`/…), because route definitions run
 once at compile time under Mutare's compile-once model and a mutation there could never
 activate; and `Phoenix.Component.sigil_H/2` (`~H`), because HEEx sigil arguments must remain
 compile-time literals — left unregistered, Mutare's imported-call witness would splice an

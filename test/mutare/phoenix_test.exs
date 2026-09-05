@@ -9,8 +9,8 @@ defmodule Mutare.PhoenixTest do
 
   import Mutare.Test
 
-  alias Mutare.Macro.Spec
-  alias Mutare.MacroRouting.Registry
+  alias Mutare.CallRouting.Spec
+  alias Mutare.CallRouting.Registry
   alias Mutare.Mutator.Dispatch
 
   doctest Mutare.Phoenix
@@ -73,20 +73,15 @@ defmodule Mutare.PhoenixTest do
     end
   end
 
-  describe "macro_routes/0 — the defensive Phoenix macro :skip (the :extensions entry)" do
+  describe "call_routes/0 — the defensive Phoenix macro :skip (the :extensions entry)" do
     test "registers the router DSL so core leaves route definitions raw" do
       registry = Registry.build([], [], [Mutare.Phoenix])
 
-      assert routing(registry, [:Phoenix, :Router], :get, 3) == [
-               :skip,
-               :skip,
-               :skip
-             ]
+      assert routing(registry, [:Phoenix, :Router], :get, 3) == :skip
 
-      assert routing(registry, [:Phoenix, :Router], :scope, 2) == [:skip, :skip]
+      assert routing(registry, [:Phoenix, :Router], :scope, 2) == :skip
 
-      assert routing(registry, [:Phoenix, :Router], :resources, 4) ==
-               [:skip, :skip, :skip, :skip]
+      assert routing(registry, [:Phoenix, :Router], :resources, 4) == :skip
 
       # An unregistered name is unaffected.
       assert routing(registry, [:Phoenix, :Router], :unknown, 1) == nil
@@ -95,7 +90,7 @@ defmodule Mutare.PhoenixTest do
     test "registers Phoenix.Component.sigil_H/2 so HEEx sigil arguments stay literal" do
       registry = Registry.build([], [], [Mutare.Phoenix])
 
-      assert routing(registry, [:Phoenix, :Component], :sigil_H, 2) == [:skip, :skip]
+      assert routing(registry, [:Phoenix, :Component], :sigil_H, 2) == :skip
     end
 
     test "a ~H return expression does not generate an imported-macro witness" do
@@ -129,7 +124,7 @@ defmodule Mutare.PhoenixTest do
     end
 
     test "every registered route skips the matched macro arguments" do
-      for {module, name, arity, :skip} <- Mutare.Phoenix.macro_routes() do
+      for {module, name, arity, :skip} <- Mutare.Phoenix.call_routes() do
         assert module in [Phoenix.Router, Phoenix.Component]
         assert is_atom(name)
         assert arity == :any or (is_integer(arity) and arity >= 0)

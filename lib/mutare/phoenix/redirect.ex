@@ -117,7 +117,7 @@ defmodule Mutare.Phoenix.Redirect do
   end
 
   # Keep the original status node's Sourceror metadata where possible. This mirrors
-  # `Mutare.Phoenix.Response`: replacing the value while keeping position metadata makes
+  # `Mutare.Plug.Status`: replacing the value while keeping position metadata makes
   # multi-argument calls render as a minimal inline diff.
   defp swap_status({:__block__, meta, [_atom]}, new_status), do: {:__block__, meta, [new_status]}
   defp swap_status(_bare_atom, new_status), do: AST.literal(new_status)

@@ -28,14 +28,16 @@ defmodule Mutare.Phoenix.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   defp description do
-    "Custom Mutare mutators for the Phoenix request surface — " <>
-      "the Plug.Conn / Phoenix.Controller calls a plug or controller action performs."
+    "Custom Mutare mutators for the Phoenix controller surface — " <>
+      "the Phoenix.Controller calls a controller action performs, plus defensive " <>
+      "routing for Phoenix's compile-time macros."
   end
 
-  # Hex package metadata. The `mutare` core is still a `path:` dependency, so an
-  # actual `mix hex.publish` stays blocked until Mutare itself ships to Hex — this
-  # section keeps the manifest ready for that day. Only runtime and doc artifacts
-  # ship — never the test suite, fixtures, or the examples app.
+  # Hex package metadata. The `mutare_plug` base package (and through it the
+  # `mutare` core) is still a `path:` dependency, so an actual `mix hex.publish`
+  # stays blocked until both ship to Hex — this section keeps the manifest ready
+  # for that day. Only runtime and doc artifacts ship — never the test suite,
+  # fixtures, or the examples app.
   defp package do
     [
       licenses: ["MIT"],
@@ -55,9 +57,12 @@ defmodule Mutare.Phoenix.MixProject do
       # `Mutare.Mutator` / `Mutare.MacroRouting` and rides only its public extension
       # points (`Mutare.Calls`, `Mutare.AST`). Tests use `Mutare.Test` and
       # `Mutare.AST` for AST parse/render, so no direct `:sourceror` dep is needed.
-      # A path dep for local development until `mutare` is published; a consuming
-      # project depends on both as `:dev`/`:test` deps.
       {:mutare, path: "../mutare"},
+      # The companion base package — this one **builds on** it: it depends on it and
+      # composes its preset (`Mutare.Plug.all/0`) with the controller-level families on
+      # top (mirroring how `phoenix` depends on `plug`). Path deps for local development
+      # until both are published; a consuming project lists both as `:dev`/`:test` deps.
+      {:mutare_plug, path: "../mutare_plug"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
@@ -74,29 +79,17 @@ defmodule Mutare.Phoenix.MixProject do
   end
 
   # ExDoc configuration. `mix docs` renders to `doc/` (gitignored). README is the
-  # landing page; `Mutare.Phoenix.ConnCall` is `@moduledoc false` plumbing and
-  # never appears.
+  # landing page. The front module doubles as the `:extensions` routing entry, so it
+  # is grouped on its own.
   defp docs do
     [
       main: "readme",
       source_url: @source_url,
       source_ref: "v#{@version}",
       extras: ["README.md", "CHANGELOG.md", "LICENSE"],
-      # `Mutare.Phoenix.Body`'s moduledoc names core's hidden overlap pass in prose
-      # (the reference is worth keeping — it explains the literal-body supersession);
-      # don't autolink to it, which also silences the "references hidden" warning.
-      skip_code_autolink_to: ["Mutare.Transform.Overlap"],
       groups_for_modules: [
-        "Mutator front": [Mutare.Phoenix],
-        "Mutator families": [
-          Mutare.Phoenix.Plug,
-          Mutare.Phoenix.Response,
-          Mutare.Phoenix.Redirect,
-          Mutare.Phoenix.Session,
-          Mutare.Phoenix.Header,
-          Mutare.Phoenix.Cookie,
-          Mutare.Phoenix.Body
-        ]
+        "Mutator front / extension": [Mutare.Phoenix],
+        "Mutator families": [Mutare.Phoenix.Redirect]
       ]
     ]
   end

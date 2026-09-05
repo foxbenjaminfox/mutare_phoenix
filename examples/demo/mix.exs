@@ -2,7 +2,8 @@ defmodule Demo.MixProject do
   use Mix.Project
 
   # A standalone, dependency-free demo project. Run Mutare against it from the
-  # mutare_phoenix repo root (the `mutare` mix task comes from the dependency):
+  # mutare_phoenix repo root (the `mutare` mix task comes from the dependency, and
+  # the `Plug.Conn` families from `mutare_plug`, the base package):
   #
   #     mix mutare examples/demo
   #

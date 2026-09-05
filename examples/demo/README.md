@@ -10,7 +10,8 @@ conn-transforming call ran** — the status it set, whether it halted.
 These are precisely the calls a suite tends to under-assert, and each gap becomes a
 survivor.
 
-From the repo root (compile the package once so its mutators are loadable):
+From the repo root (compile the package once so both packages' mutators are loadable —
+`mutare_plug`'s families come in through the dependency):
 
 ```
 mix compile
@@ -44,7 +45,8 @@ lib/demo/page_controller.ex:23  [redirect_status, in-place]  SURVIVED
 mutation score: 37.5%  (3 killed, 5 survived, 8 total)
 ```
 
-Each survivor is a real test-quality gap. Grouped by family:
+Each survivor is a real test-quality gap. Grouped by family — the first two are `mutare_plug`
+families composed in through `Mutare.Plug.all/0`, the third is this package's:
 
 - **`:plug_halt` — the forgotten halt** (`Demo.Auth`). The auth plug sets `401` *and*
   halts. The test asserts the `401` (so the `:http_status` mutant `:unauthorized →
@@ -63,7 +65,7 @@ Each survivor is a real test-quality gap. Grouped by family:
   target. So changing the status to another valid redirect status (`:moved_permanently`,
   `:see_other`) is invisible. Two survivors, one per plausible sibling.
 
-The lesson is the package's whole thesis: when a function's behaviour *is* its conn
+The lesson is the packages' whole thesis: when a function's behaviour *is* its conn
 transformation, asserting "something happened" isn't enough — you have to assert *which*
 transformation, with *what* arguments. Mutare turns every place you didn't into a survivor.
 

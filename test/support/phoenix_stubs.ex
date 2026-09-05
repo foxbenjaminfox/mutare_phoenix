@@ -1,14 +1,18 @@
-# Minimal stand-ins for the `Plug.Conn` / `Phoenix.Controller` / `Phoenix.Router` surface,
-# loaded only in the test environment. `mutare_phoenix` depends on neither `plug` nor
-# `phoenix` (it matches on module *names*), so these tiny modules let the test suite:
+# Minimal stand-ins for the `Plug.Conn` / `Phoenix.Controller` / `Phoenix.Router` /
+# `Phoenix.Component` surface, loaded only in the test environment. `mutare_phoenix` depends
+# on neither `plug` nor `phoenix` (it matches on module *names*), so these tiny modules let
+# the test suite:
 #
-#   * resolve a **bare imported** call (`import Plug.Conn; put_status(conn, :ok)`) — the form
-#     `use MyAppWeb, :controller` produces — which `Mutare.Transform.Imports` resolves by
-#     reflecting on the imported module's exported arities, so the module must be loadable;
+#   * resolve a **bare imported** call (`import Phoenix.Controller; redirect(conn, ...)`) —
+#     the form `use MyAppWeb, :controller` produces — which `Mutare.Transform.Imports`
+#     resolves by reflecting on the imported module's exported arities, so the module must be
+#     loadable;
 #   * compile a generated metamutant without "undefined function" warnings.
 #
 # They carry no behaviour worth testing — the mutators operate on source AST, not a live
-# conn — so the bodies are the smallest thing that type-checks as `conn -> conn`.
+# conn — so the bodies are the smallest thing that type-checks as `conn -> conn`. The
+# `Plug.Conn` slice is only what the cross-package integration test and the
+# `Phoenix.Controller` stand-in reach for; `mutare_plug` carries the full stand-in.
 defmodule Plug.Conn do
   @moduledoc false
   defstruct status: nil,
@@ -27,52 +31,17 @@ defmodule Plug.Conn do
   def put_resp_content_type(%__MODULE__{} = conn, type),
     do: %{conn | resp_headers: [{"content-type", type} | conn.resp_headers]}
 
-  def put_resp_content_type(%__MODULE__{} = conn, type, charset),
-    do: put_resp_content_type(conn, "#{type}; charset=#{charset}")
-
   def send_resp(%__MODULE__{} = conn, status, body),
     do: %{conn | status: status, resp_body: body}
-
-  def resp(%__MODULE__{} = conn, status, body),
-    do: %{conn | status: status, resp_body: body}
-
-  def send_chunked(%__MODULE__{} = conn, status), do: %{conn | status: status}
-
-  def send_file(%__MODULE__{} = conn, status, path),
-    do: %{conn | status: status, resp_body: path}
-
-  def send_file(%__MODULE__{} = conn, status, path, _offset),
-    do: %{conn | status: status, resp_body: path}
-
-  def send_file(%__MODULE__{} = conn, status, path, _offset, _length),
-    do: %{conn | status: status, resp_body: path}
 
   def put_session(%__MODULE__{} = conn, key, value),
     do: assign(conn, :session, Map.put(Map.get(conn.assigns, :session, %{}), key, value))
 
-  def delete_session(%__MODULE__{} = conn, key),
-    do: assign(conn, :session, Map.delete(Map.get(conn.assigns, :session, %{}), key))
-
-  def clear_session(%__MODULE__{} = conn), do: assign(conn, :session, %{})
-
-  def configure_session(%__MODULE__{} = conn, _opts), do: conn
-
-  def delete_resp_header(%__MODULE__{} = conn, key),
-    do: %{conn | resp_headers: List.keydelete(conn.resp_headers, key, 0)}
-
   def put_resp_header(%__MODULE__{} = conn, key, value),
     do: %{conn | resp_headers: [{key, value} | List.keydelete(conn.resp_headers, key, 0)]}
 
-  def put_resp_cookie(%__MODULE__{} = conn, key, value),
-    do: put_resp_cookie(conn, key, value, [])
-
   def put_resp_cookie(%__MODULE__{} = conn, key, value, opts),
     do: %{conn | resp_cookies: Map.put(conn.resp_cookies, key, {value, opts})}
-
-  def delete_resp_cookie(%__MODULE__{} = conn, key), do: delete_resp_cookie(conn, key, [])
-
-  def delete_resp_cookie(%__MODULE__{} = conn, key, opts),
-    do: %{conn | resp_cookies: Map.put(conn.resp_cookies, key, {:delete, opts})}
 end
 
 defmodule Phoenix.Controller do

@@ -1,8 +1,8 @@
 # A minimal stand-in for the slice of `Plug.Conn` / `Phoenix.Controller` the demo uses, so
-# the project runs with no real Phoenix dependency. `mutare_phoenix` matches calls by module
-# *name* (`Plug.Conn`, `Phoenix.Controller`), so the mutations against these stand-ins are
-# identical to what they would be against the real modules. It lives outside `lib/demo`, so
-# `.mutare.exs`'s `paths: ["lib/demo"]` leaves it unmutated.
+# the project runs with no real Phoenix dependency. `mutare_plug` and `mutare_phoenix` match
+# calls by module *name* (`Plug.Conn`, `Phoenix.Controller`), so the mutations against these
+# stand-ins are identical to what they would be against the real modules. It lives outside
+# `lib/demo`, so `.mutare.exs`'s `paths: ["lib/demo"]` leaves it unmutated.
 defmodule Plug.Conn do
   @moduledoc "Tiny stand-in for `Plug.Conn`."
   defstruct status: nil, halted: false, assigns: %{}, resp_body: nil

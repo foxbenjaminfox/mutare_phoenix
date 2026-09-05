@@ -53,6 +53,23 @@ defmodule Phoenix.Controller do
 
   def json(%Conn{} = conn, data), do: Conn.send_resp(conn, conn.status || 200, data)
   def text(%Conn{} = conn, data), do: Conn.send_resp(conn, conn.status || 200, data)
+  def html(%Conn{} = conn, data), do: Conn.send_resp(conn, conn.status || 200, data)
+
+  def send_download(conn, kind, opts \\ [])
+
+  def send_download(%Conn{} = conn, {:file, path}, opts),
+    do: download(conn, Keyword.get(opts, :filename, Path.basename(path)), opts, path)
+
+  def send_download(%Conn{} = conn, {:binary, contents}, opts),
+    do: download(conn, Keyword.fetch!(opts, :filename), opts, contents)
+
+  defp download(conn, filename, opts, body) do
+    disposition = Keyword.get(opts, :disposition, :attachment)
+
+    conn
+    |> Conn.put_resp_header("content-disposition", ~s[#{disposition}; filename="#{filename}"])
+    |> Conn.send_resp(conn.status || 200, body)
+  end
 
   def redirect(%Conn{} = conn, opts) when is_list(opts) do
     conn

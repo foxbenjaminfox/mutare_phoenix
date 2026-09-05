@@ -17,17 +17,20 @@ it depends on it, so those families are on your code path too, ready to compose.
 
 ## The families
 
-`Mutare.Phoenix.all/0` returns the `Phoenix.Controller` families:
+`Mutare.Phoenix.all/0` returns three `Phoenix.Controller` families:
 
 | Family | Name | Mutation | The gap a survivor exposes |
 | --- | --- | --- | --- |
 | `Mutare.Phoenix.Redirect` | `:redirect_status` | swaps the explicit atom `status:` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling (`:found → :see_other`, `:moved_permanently → :permanent_redirect`) | no test pins the exact redirect status |
+| `Mutare.Phoenix.Body` | `:controller_body` | blanks the body argument of `Phoenix.Controller.json/2` to `%{}` and of `text/2` / `html/2` to `""` | no test reads the rendered body |
+| `Mutare.Phoenix.Download` | `:download_disposition` | flips the explicit `disposition:` option of `Phoenix.Controller.send_download/3` between `:attachment` and `:inline` | no test pins whether the browser is told to save or display the file |
 
-The family matches its call written directly (`Phoenix.Controller.redirect(conn, ...)`),
+Each family matches its call written directly (`Phoenix.Controller.redirect(conn, ...)`),
 aliased, or bare-imported (`redirect(conn, ...)`, the form `use MyAppWeb, :controller`
-produces). It only mutates an explicit literal atom `status:` option; redirects that rely on
-Phoenix's default, integer statuses, and variable statuses are left to other families or
-skipped.
+produces). The option families only mutate an explicit literal atom: redirects and
+downloads that rely on Phoenix's default, integer statuses, and variable values are left to
+other families or skipped. `render/3` is out of scope for `:controller_body` — its argument
+names a template, not a body.
 
 The `Plug.Conn` side of a controller action — `put_status`, `send_resp`, `put_session`,
 `put_resp_header`, `put_resp_cookie`, `halt` — is the base package's six families,
@@ -84,17 +87,20 @@ mix mutare
 
 In a status position, Mutare's built-in atom swaps (`:ok → :error` / `:mutare`) produce a
 value that **crashes** — an uninformative kill that tells you nothing about test quality.
-`:redirect_status` swaps to *valid* siblings, so a survivor means a genuine missing
+`:redirect_status` and `:download_disposition` swap to *valid* siblings (Phoenix rejects any
+disposition other than `:attachment` / `:inline`), so a survivor means a genuine missing
 assertion rather than a crash, and Mutare's overlap pruning drops the redundant crashing
-leaves at the same range.
+leaves at the same range. `:controller_body` works the same way for a literal `text` / `html`
+body: its whole-call blank covers the string node, so the built-in string family's sentinel
+leaves there are pruned automatically and one clean "is the body read?" mutant remains.
 
 ## Example
 
 [`examples/demo`](https://github.com/foxbenjaminfox/mutare_phoenix/tree/HEAD/examples/demo) is
 a standalone mini-project — an auth plug and a few controller actions over a tiny
 `Plug.Conn` / `Phoenix.Controller` stand-in — with deliberate test gaps that surface
-survivors in the halt and status families (from `mutare_plug`) and the redirect family (this
-package). From the repo root:
+survivors in the halt and status families (from `mutare_plug`) and the redirect, body, and
+download families (this package). From the repo root:
 
 ```
 mix compile

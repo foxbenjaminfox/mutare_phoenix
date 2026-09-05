@@ -26,4 +26,25 @@ defmodule Demo.PageControllerTest do
     conn = PageController.login(%Plug.Conn{}, %{})
     assert conn.resp_body == "/login"
   end
+
+  # ping asserts the body is *text*, never what it says — so blanking it to "" is
+  # invisible. A missing body assertion: `:controller_body` survives.
+  test "ping answers with a text body" do
+    conn = PageController.ping(%Plug.Conn{}, %{})
+    assert is_binary(conn.resp_body)
+  end
+
+  # export asserts the file *name* reaches the content-disposition header, never the
+  # disposition *type* — so flipping :attachment to :inline (display in the browser instead
+  # of saving) is invisible. A missing disposition assertion: `:download_disposition`
+  # survives.
+  test "export names the report file" do
+    conn = PageController.export(%Plug.Conn{}, %{})
+
+    assert {"content-disposition", value} =
+             List.keyfind(conn.resp_headers, "content-disposition", 0)
+
+    assert value =~ ~s(filename="report.csv")
+    assert conn.resp_body =~ "welcome"
+  end
 end

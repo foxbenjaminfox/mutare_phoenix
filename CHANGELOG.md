@@ -16,6 +16,14 @@ families (`:plug_halt`, `:http_status`, `:plug_session`, `:resp_header`,
 - `Mutare.Phoenix.Redirect` (`:redirect_status`) — swaps explicit atom
   `status:` options on `Phoenix.Controller.redirect/2` among valid redirect
   status siblings.
+- `Mutare.Phoenix.Body` (`:controller_body`) — blanks the body argument of
+  `Phoenix.Controller.json/2` to `%{}` and of `text/2` / `html/2` to `""`
+  ("does any test read the rendered body?"); on a literal text/html body its
+  whole-call rewrite supersedes the built-in string family's sentinel leaves
+  via Mutare's overlap pruning.
+- `Mutare.Phoenix.Download` (`:download_disposition`) — flips the explicit
+  `disposition:` option of `Phoenix.Controller.send_download/3` between
+  `:attachment` and `:inline`.
 - `Mutare.Phoenix` as a `Mutare.MacroRouting` extension (list it under
   `:extensions`): registers the `Phoenix.Router` DSL (`get`/`scope`/…) as
   `:skip`, so compile-time route definitions are left unmutated, and

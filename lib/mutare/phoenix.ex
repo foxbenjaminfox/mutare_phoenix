@@ -21,10 +21,15 @@ defmodule Mutare.Phoenix do
         extensions: [Mutare.Phoenix]
       ]
 
-  `all/0` returns this package's families:
+  `all/0` returns this package's three families:
 
     * `Mutare.Phoenix.Redirect` — `:redirect_status`, swaps the explicit atom
       `:status` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling.
+    * `Mutare.Phoenix.Body` — `:controller_body`, blanks the body of
+      `Phoenix.Controller.json/2` (to `%{}`), `text/2`, and `html/2` (to `""`).
+    * `Mutare.Phoenix.Download` — `:download_disposition`, flips the explicit
+      `:disposition` option of `Phoenix.Controller.send_download/3` between
+      `:attachment` and `:inline`.
 
   It does **not** include the `mutare_plug` families; compose `Mutare.Plug.all/0` explicitly
   as shown above. Each family matches its call written directly
@@ -54,7 +59,7 @@ defmodule Mutare.Phoenix do
   # `Phoenix.Component`), so this package depends on neither `phoenix` nor `plug` —
   # resolution happens in the target project, where they are present. The `Plug.Conn`
   # surface is the base `mutare_plug`; LiveView is the companion `mutare_phoenix_live_view`.
-  @families [Mutare.Phoenix.Redirect]
+  @families [Mutare.Phoenix.Redirect, Mutare.Phoenix.Body, Mutare.Phoenix.Download]
 
   # The `Phoenix.Router` DSL, registered `:skip` so core leaves route definitions raw.
   # `:any` arity covers every form (`get/3`, `get/4`, `scope/2..4`, …).
@@ -89,7 +94,7 @@ defmodule Mutare.Phoenix do
   the `Mutare.Plug.all/0` and `:builtins` pairing).
 
       iex> Mutare.Phoenix.all()
-      [Mutare.Phoenix.Redirect]
+      [Mutare.Phoenix.Redirect, Mutare.Phoenix.Body, Mutare.Phoenix.Download]
   """
   @spec all() :: [module()]
   def all, do: @families

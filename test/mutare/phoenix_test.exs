@@ -26,8 +26,12 @@ defmodule Mutare.PhoenixTest do
   end
 
   describe "all/0" do
-    test "is the Redirect family" do
-      assert Mutare.Phoenix.all() == [Mutare.Phoenix.Redirect]
+    test "is the three families in order" do
+      assert Mutare.Phoenix.all() == [
+               Mutare.Phoenix.Redirect,
+               Mutare.Phoenix.Body,
+               Mutare.Phoenix.Download
+             ]
     end
 
     test "every entry resolves as a Mutare.Mutator" do
@@ -43,14 +47,16 @@ defmodule Mutare.PhoenixTest do
       specs = Mutare.Mutators.resolve([:builtins] ++ Mutare.Plug.all() ++ Mutare.Phoenix.all())
       names = Enum.map(specs, & &1.name)
 
-      assert Enum.take(names, -7) == [
+      assert Enum.take(names, -9) == [
                :plug_halt,
                :http_status,
                :plug_session,
                :resp_header,
                :resp_cookie,
                :resp_body,
-               :redirect_status
+               :redirect_status,
+               :controller_body,
+               :download_disposition
              ]
 
       # Spot-check the expansion across the built-in categories: an operator family,
@@ -159,6 +165,14 @@ defmodule Mutare.PhoenixTest do
       def health(conn, _params) do
         send_resp(conn, 200, "ok")
       end
+
+      def ping(conn, _params) do
+        text(conn, "pong")
+      end
+
+      def export(conn, _params) do
+        send_download(conn, {:binary, "a,b"}, filename: "r.csv", disposition: :attachment)
+      end
     end
     """
 
@@ -171,6 +185,8 @@ defmodule Mutare.PhoenixTest do
         |> Enum.sort()
 
       assert names == [
+               :controller_body,
+               :download_disposition,
                :http_status,
                :plug_halt,
                :plug_session,

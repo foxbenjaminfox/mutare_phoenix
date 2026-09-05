@@ -22,4 +22,17 @@ defmodule Demo.PageController do
   def login(conn, _params) do
     Phoenix.Controller.redirect(conn, to: "/login", status: :found)
   end
+
+  @doc "Answer a liveness probe with a fixed text body."
+  def ping(conn, _params) do
+    Phoenix.Controller.text(conn, "pong")
+  end
+
+  @doc "Export the report as a CSV file the browser should save, not display."
+  def export(conn, _params) do
+    Phoenix.Controller.send_download(conn, {:binary, "id,name\n1,welcome\n"},
+      filename: "report.csv",
+      disposition: :attachment
+    )
+  end
 end

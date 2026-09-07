@@ -5,7 +5,9 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.1.0 - Unreleased
+## [Unreleased]
+
+## [0.1.0] - 2026-09-07
 
 Initial release. Builds on `mutare_plug`, which carries the `Plug.Conn`
 families (`:plug_halt`, `:http_status`, `:plug_session`, `:resp_header`,
@@ -31,3 +33,6 @@ families (`:plug_halt`, `:http_status`, `:plug_session`, `:resp_header`,
   HEEx never poisons the metamutant build.
 - `Mutare.Phoenix.all/0` for splicing the Phoenix families into a `:mutators`
   list, composing with `Mutare.Plug.all/0`.
+
+[Unreleased]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/foxbenjaminfox/mutare_phoenix/releases/tag/v0.1.0

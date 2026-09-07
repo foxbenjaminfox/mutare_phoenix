@@ -28,16 +28,11 @@ defmodule Mutare.Phoenix.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   defp description do
-    "Custom Mutare mutators for the Phoenix controller surface — " <>
-      "the Phoenix.Controller calls a controller action performs, plus defensive " <>
-      "routing for Phoenix's compile-time macros."
+    "Mutare mutators for Phoenix"
   end
 
-  # Hex package metadata. The `mutare_plug` base package (and through it the
-  # `mutare` core) is still a `path:` dependency, so an actual `mix hex.publish`
-  # stays blocked until both ship to Hex — this section keeps the manifest ready
-  # for that day. Only runtime and doc artifacts ship — never the test suite,
-  # fixtures, or the examples app.
+  # Hex package metadata. Only runtime and doc artifacts ship — never the test
+  # suite, fixtures, or the examples app.
   defp package do
     [
       licenses: ["MIT"],
@@ -54,15 +49,15 @@ defmodule Mutare.Phoenix.MixProject do
   defp deps do
     [
       # The host mutation-testing engine. `mutare_phoenix` implements
-      # `Mutare.Mutator` / `Mutare.MacroRouting` and rides only its public extension
+      # `Mutare.Mutator` / `Mutare.CallRouting` and rides only its public extension
       # points (`Mutare.Calls`, `Mutare.AST`). Tests use `Mutare.Test` and
       # `Mutare.AST` for AST parse/render, so no direct `:sourceror` dep is needed.
-      {:mutare, path: "../mutare"},
+      {:mutare, "~> 0.1"},
       # The companion base package — this one **builds on** it: it depends on it and
       # composes its preset (`Mutare.Plug.all/0`) with the controller-level families on
-      # top (mirroring how `phoenix` depends on `plug`). Path deps for local development
-      # until both are published; a consuming project lists both as `:dev`/`:test` deps.
-      {:mutare_plug, path: "../mutare_plug"},
+      # top (mirroring how `phoenix` depends on `plug`). A consuming project lists both
+      # as `:dev`/`:test` deps.
+      {:mutare_plug, "~> 0.1"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}

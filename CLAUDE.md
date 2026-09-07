@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`mutare_phoenix` is an Elixir library of **custom [Mutare](https://hex.pm/packages/mutare) mutators** for the Phoenix controller surface — the `Phoenix.Controller` calls a controller action performs on the conn — plus the defensive `Mutare.MacroRouting` extension that keeps Phoenix's compile-time macros from poisoning the metamutant build. It does not test Phoenix apps directly; it plugs into the Mutare mutation-testing engine. See `README.md` for the user-facing description and `examples/demo/README.md` for a worked walkthrough.
+`mutare_phoenix` is an Elixir library of **custom [Mutare](https://hex.pm/packages/mutare) mutators** for the Phoenix controller surface — the `Phoenix.Controller` calls a controller action performs on the conn — plus the defensive `Mutare.CallRouting` extension that keeps Phoenix's compile-time macros from poisoning the metamutant build. It does not test Phoenix apps directly; it plugs into the Mutare mutation-testing engine. See `README.md` for the user-facing description and `examples/demo/README.md` for a worked walkthrough.
 
 ## Commands
 
 ```sh
-mix deps.get                       # fetch deps (mutare and mutare_plug are path deps at ../mutare, ../mutare_plug)
+mix deps.get                       # fetch deps (mutare and mutare_plug come from Hex)
 mix compile
 mix test                           # full suite (async)
 mix test test/mutare/phoenix/redirect_test.exs          # one file
@@ -33,7 +33,7 @@ mix mutare examples/demo           # appends the compiled packages' ebins to its
 
 - `{:mutare, "~> 0.1"}` and `{:mutare_plug, "~> 0.1"}` come from Hex (`deps/mutare`, `deps/mutare_plug`). The engine source (`Mutare.Mutator`, `Mutare.CallRouting`, `Mutare.Extension`, `Mutare.Test`, `Mutare.Transform.Calls`, `Mutare.AST`, the `# mutare:ignore` reader, etc.) is also checked out as a sibling at `../mutare/lib` (and the base package at `../mutare_plug/lib`) — **read it there when you need the exact contract** of a callback or helper, since this package only consumes Mutare's public extension points. To develop against unreleased core or base-package changes, switch the dep to `{:mutare, path: "../mutare"}` / `{:mutare_plug, path: "../mutare_plug"}` locally and switch it back before committing.
 - This package **builds on** `mutare_plug` the way `phoenix` builds on `plug`: depending on it puts the `Plug.Conn` families (`Mutare.Plug.all/0`) on the code path, but `Mutare.Phoenix.all/0` returns **only this package's families** — a consumer composes the two presets explicitly. The engine does not dedup a family listed twice, which is why `all/0` must never fold `Mutare.Plug.all/0` in.
-- `lib/mutare/phoenix.ex` is the public entry (`all/0`) **and** the `:extensions` routing entry (`macro_routes/0`); each family is one module under `lib/mutare/phoenix/`. Test files mirror that layout under `test/mutare/phoenix/`.
+- `lib/mutare/phoenix.ex` is the public entry (`all/0`) **and** the `:extensions` routing entry (`call_routes/0`); each family is one module under `lib/mutare/phoenix/`. Test files mirror that layout under `test/mutare/phoenix/`.
 - `mutare_phoenix_live_view` builds on this package in turn; keep families belonging to the LiveView socket surface out of here (see Scope).
 
 ## Architecture
@@ -54,9 +54,9 @@ Registered in `lib/mutare/phoenix.ex` via `@families` / `all/0`:
 
 To add a family: implement the `Mutare.Mutator` behaviour, add the module to `@families` (and the `all/0` doctest, which asserts the exact list), export any newly matched function/arity from `test/support/phoenix_stubs.ex`, and add a test module mirroring the existing ones. `Plug.Conn` calls never belong here — those are `mutare_plug`. Flash atoms (`put_flash/3`'s `:info` / `:error`) are deliberately **not** a family: the built-in atom families already flip them (`:info → :mutare`, `:error → :ok`), so a test that never checks the flash kind is caught regardless.
 
-### The `:extensions` entry — `Mutare.Phoenix.macro_routes/0`
+### The `:extensions` entry — `Mutare.Phoenix.call_routes/0`
 
-`Mutare.Phoenix` implements `Mutare.MacroRouting` (and is **not** a mutator — it has no `name/0`; `Mutare.Extension` rejects mutator modules under `:extensions`, and `phoenix_test.exs` pins this). Its `macro_routes/0` registers as `:skip`:
+`Mutare.Phoenix` implements `Mutare.CallRouting` (and is **not** a mutator — it has no `name/0`; `Mutare.Extension` rejects mutator modules under `:extensions`, and `phoenix_test.exs` pins this). Its `call_routes/0` registers as `:skip`:
 
 - the `Phoenix.Router` DSL (`get`/`scope`/`pipeline`/…, any arity) — a router body is compile-time code that runs once as mutant 0 under Mutare's compile-once model, so a mutation there could never activate; skipping saves mutant ids;
 - `Phoenix.Component.sigil_H/2` — HEEx sigil arguments must stay compile-time literals. Left unregistered, Mutare's imported-call witness would splice an unreachable `sigil_H(arg1, arg2)`; macros still expand in unreachable code, so Phoenix raises before poison recovery can isolate a single mutant. Mutations *around* the `~H` expression (e.g. `:return_value`) remain available.
@@ -66,7 +66,7 @@ A routing-only module belongs under `:extensions`, not `:mutators` (`Mutare.Muta
 ### Mutare extension points used
 
 - `Mutare.Calls.resolved_call(node)` → `{module_path, fun, args, rebuild}` — resolves direct/aliased/bare-imported call forms uniformly (the published facade; `Mutare.Transform.Calls` is core-internal). The `rebuild` closure reconstructs the call from new args.
-- `Mutare.Mutator` callbacks: `name/0` plus at least one producer — `mutate/1` and/or the context-aware `mutate/2`, both optional individually. `Mutare.MacroRouting`'s `macro_routes/0` lives on the front module.
+- `Mutare.Mutator` callbacks: `name/0` plus at least one producer — `mutate/1` and/or the context-aware `mutate/2`, both optional individually. `Mutare.CallRouting`'s `call_routes/0` lives on the front module.
 - `Mutare.AST` — `parse!`, `literal`, `literal_value` for AST construction/inspection.
 - `Mutare.Mutator.effective_arity/2` and `visible_index/2` — recover argument positions under pipe context.
 

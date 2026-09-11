@@ -1,9 +1,10 @@
 defmodule Mutare.Phoenix do
   @moduledoc """
-  Custom [Mutare](https://hex.pm/packages/mutare) mutators for the Phoenix controller
-  surface — the `Phoenix.Controller` calls a controller action performs on the conn — plus
-  the defensive macro routing that keeps Phoenix's compile-time macros from poisoning the
-  metamutant build.
+  Custom [Mutare](https://hex.pm/packages/mutare) mutators for the Phoenix server-side
+  surface — the `Phoenix.Controller` calls a controller action performs on the conn, the
+  `Phoenix.Channel` replies and outbound messages, `Phoenix.PubSub`, and `Phoenix.Token` —
+  plus the defensive macro routing that keeps Phoenix's compile-time macros from poisoning
+  the metamutant build.
 
   This package builds on `mutare_plug` the way `phoenix` builds on `plug`: it depends on it,
   so the `Plug.Conn` families (`Mutare.Plug.all/0`) are on your code path too, ready to
@@ -21,7 +22,7 @@ defmodule Mutare.Phoenix do
         extensions: [Mutare.Phoenix]
       ]
 
-  `all/0` returns this package's three families:
+  `all/0` returns this package's seven families:
 
     * `Mutare.Phoenix.Redirect` — `:redirect_status`, swaps the explicit atom
       `:status` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling.
@@ -30,11 +31,24 @@ defmodule Mutare.Phoenix do
     * `Mutare.Phoenix.Download` — `:download_disposition`, flips the explicit
       `:disposition` option of `Phoenix.Controller.send_download/3` between
       `:attachment` and `:inline`.
+    * `Mutare.Phoenix.ChannelReply` — `:channel_reply`, drops the reply element of a
+      `Phoenix.Channel` callback return (`{:ok, reply, socket}` → `{:ok, socket}`,
+      `{:reply, reply, socket}` → `{:noreply, socket}`, `{:stop, reason, reply, socket}` →
+      `{:stop, reason, socket}`), gated on `@behaviour Phoenix.Channel`.
+    * `Mutare.Phoenix.ChannelMessage` — `:channel_message`, removes a `Phoenix.Channel`
+      outbound message — `broadcast/3` and its `!`/`_from` siblings, `push/3`, `reply/2` —
+      collapsing the call to `:ok`.
+    * `Mutare.Phoenix.PubSub` — `:pubsub`, removes a `Phoenix.PubSub` `subscribe`,
+      `unsubscribe`, or broadcast call, collapsing it to `:ok`.
+    * `Mutare.Phoenix.Token` — `:token`, swaps a `Phoenix.Token` call for its sibling
+      scheme (`sign` ↔ `encrypt`, `verify` ↔ `decrypt`), blanks a minted token's payload to
+      `nil`, and turns an explicit `max_age:` into `:infinity`.
 
   It does **not** include the `mutare_plug` families; compose `Mutare.Plug.all/0` explicitly
-  as shown above. Each family matches its call written directly
+  as shown above. Each call family matches its call written directly
   (`Phoenix.Controller.redirect(conn, ...)`), aliased, or bare-imported
-  (`redirect(conn, ...)`, the form `use MyAppWeb, :controller` produces).
+  (`redirect(conn, ...)`, the form `use MyAppWeb, :controller` produces; `broadcast(socket,
+  ...)`, the form `use Phoenix.Channel` produces).
 
   ## The `:extensions` entry
 
@@ -59,7 +73,15 @@ defmodule Mutare.Phoenix do
   # `Phoenix.Component`), so this package depends on neither `phoenix` nor `plug` —
   # resolution happens in the target project, where they are present. The `Plug.Conn`
   # surface is the base `mutare_plug`; LiveView is the companion `mutare_phoenix_live_view`.
-  @families [Mutare.Phoenix.Redirect, Mutare.Phoenix.Body, Mutare.Phoenix.Download]
+  @families [
+    Mutare.Phoenix.Redirect,
+    Mutare.Phoenix.Body,
+    Mutare.Phoenix.Download,
+    Mutare.Phoenix.ChannelReply,
+    Mutare.Phoenix.ChannelMessage,
+    Mutare.Phoenix.PubSub,
+    Mutare.Phoenix.Token
+  ]
 
   # The `Phoenix.Router` DSL, registered `:skip` so core leaves route definitions raw.
   # `:any` arity covers every form (`get/3`, `get/4`, `scope/2..4`, …).
@@ -94,7 +116,9 @@ defmodule Mutare.Phoenix do
   the `Mutare.Plug.all/0` and `:builtins` pairing).
 
       iex> Mutare.Phoenix.all()
-      [Mutare.Phoenix.Redirect, Mutare.Phoenix.Body, Mutare.Phoenix.Download]
+      [Mutare.Phoenix.Redirect, Mutare.Phoenix.Body, Mutare.Phoenix.Download,
+       Mutare.Phoenix.ChannelReply, Mutare.Phoenix.ChannelMessage, Mutare.Phoenix.PubSub,
+       Mutare.Phoenix.Token]
   """
   @spec all() :: [module()]
   def all, do: @families
@@ -102,7 +126,10 @@ defmodule Mutare.Phoenix do
   # Defensive, not a route mutator: a router body is compile-time code that runs once as
   # mutant 0, so route/verb/pipeline mutations can never activate under Mutare's compile-once
   # model. Skipping the DSL keeps core from wasting mutant ids on it. Plug *function* bodies
-  # (`def call/2`) and controller actions are ordinary runtime code and are still mutated.
+  # (`def call/2`), controller actions, and channel callbacks are ordinary runtime code and
+  # are still mutated. The channel-side declarations (`Phoenix.Socket.channel/2,3`,
+  # `Phoenix.Channel.intercept/1`) need no route: they are plain module-body calls with no
+  # `do` block, and core never descends those in the first place.
   @impl Mutare.CallRouting
   @spec call_routes() :: [Mutare.CallRouting.route()]
   def call_routes do

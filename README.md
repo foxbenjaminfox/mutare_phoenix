@@ -5,16 +5,20 @@
 [![CI](https://github.com/foxbenjaminfox/mutare_phoenix/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/foxbenjaminfox/mutare_phoenix/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/mutare_phoenix.svg)](https://github.com/foxbenjaminfox/mutare_phoenix/blob/master/LICENSE)
 
-Custom [Mutare](https://hex.pm/packages/mutare) mutators for the **Phoenix controller surface** —
-the `Phoenix.Controller` calls a controller action performs on the conn — plus the defensive
+Custom [Mutare](https://hex.pm/packages/mutare) mutators for the **Phoenix server-side surface** —
+the `Phoenix.Controller` calls a controller action performs on the conn, the `Phoenix.Channel`
+replies and outbound messages, `Phoenix.PubSub`, and `Phoenix.Token` — plus the defensive
 macro routing that keeps Phoenix's compile-time macros (the `Phoenix.Router` DSL, `~H`) from
 poisoning the metamutant build.
 
 A controller action returns a *transformed conn*, so its whole contract is **which
 conn-transforming call ran** — the status it set, where it redirected, whether it halted.
 These are exactly the calls a suite tends to under-assert: a test that checks "something
-happened" but not *which* transformation leaves a gap. `mutare_phoenix` turns each such gap
-into a located [Mutare](https://hex.pm/packages/mutare) survivor.
+happened" but not *which* transformation leaves a gap. A channel has the same shape of gap
+on its outbound side — the reply a `join`/`handle_in` returns, the message it broadcasts or
+pushes, the PubSub topic it subscribes to — where a test that only checks the socket came
+back leaves the client-facing effect unasserted. `mutare_phoenix` turns each such gap into a
+located [Mutare](https://hex.pm/packages/mutare) survivor.
 
 It **builds on** [`mutare_plug`](https://hex.pm/packages/mutare_plug) (the `Plug.Conn`
 families — halt, status, session, header, cookie, body) the way `phoenix` builds on `plug`:
@@ -22,20 +26,32 @@ it depends on it, so those families are on your code path too, ready to compose.
 
 ## The families
 
-`Mutare.Phoenix.all/0` returns three `Phoenix.Controller` families:
+`Mutare.Phoenix.all/0` returns three `Phoenix.Controller` families, two `Phoenix.Channel`
+ones, a `Phoenix.PubSub` one, and a `Phoenix.Token` one:
 
 | Family | Name | Mutation | The gap a survivor exposes |
 | --- | --- | --- | --- |
 | `Mutare.Phoenix.Redirect` | `:redirect_status` | swaps the explicit atom `status:` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling (`:found → :see_other`, `:moved_permanently → :permanent_redirect`) | no test pins the exact redirect status |
 | `Mutare.Phoenix.Body` | `:controller_body` | blanks the body argument of `Phoenix.Controller.json/2` to `%{}` and of `text/2` / `html/2` to `""` | no test reads the rendered body |
 | `Mutare.Phoenix.Download` | `:download_disposition` | flips the explicit `disposition:` option of `Phoenix.Controller.send_download/3` between `:attachment` and `:inline` | no test pins whether the browser is told to save or display the file |
+| `Mutare.Phoenix.ChannelReply` | `:channel_reply` | drops the reply element of a `Phoenix.Channel` callback return: `{:ok, reply, socket}` → `{:ok, socket}`, `{:reply, reply, socket}` → `{:noreply, socket}`, `{:stop, reason, reply, socket}` → `{:stop, reason, socket}` (gated on `@behaviour Phoenix.Channel`) | no test checks the join reply or `assert_reply`s the `handle_in` reply |
+| `Mutare.Phoenix.ChannelMessage` | `:channel_message` | removes a `Phoenix.Channel` outbound message — `broadcast/3` and its `!`/`_from` siblings, `push/3`, `reply/2` — collapsing the call to `:ok` (variants `broadcast`, `push`, `reply`) | no test `assert_broadcast`s / `assert_push`es / `assert_reply`s the message |
+| `Mutare.Phoenix.PubSub` | `:pubsub` | removes a `Phoenix.PubSub` `subscribe`, `unsubscribe`, or broadcast call (every `broadcast`/`broadcast_from`/`local_broadcast`/`direct_broadcast` form), collapsing it to `:ok` (variants `subscribe`, `unsubscribe`, `broadcast`) | no test delivers a message on the topic and checks the subscriber reacted, or asserts a broadcast arrived |
+| `Mutare.Phoenix.Token` | `:token` | swaps a `Phoenix.Token` call for its sibling scheme (`sign` ↔ `encrypt`, `verify` ↔ `decrypt`; variant `scheme`), blanks a `sign`/`encrypt` payload to `nil` (`payload`), and turns an explicit integer `max_age:` of `verify`/`decrypt` into `:infinity` (`expiry`, with the position marked `:timeout` so the built-in integer family leaves the duration literal alone) | no test round-trips the token, checks the payload it carries, or presents an expired one |
 
-Each family matches its call written directly (`Phoenix.Controller.redirect(conn, ...)`),
+Each call family matches its call written directly (`Phoenix.Controller.redirect(conn, ...)`),
 aliased, or bare-imported (`redirect(conn, ...)`, the form `use MyAppWeb, :controller`
-produces). The option families only mutate an explicit literal atom: redirects and
-downloads that rely on Phoenix's default, integer statuses, and variable values are left to
-other families or skipped. `render/3` is out of scope for `:controller_body` — its argument
-names a template, not a body.
+produces; `broadcast(socket, ...)`, the form `use Phoenix.Channel` produces). The option
+families only mutate an explicit literal atom: redirects and downloads that rely on Phoenix's
+default, integer statuses, and variable values are left to other families or skipped.
+`render/3` is out of scope for `:controller_body` — its argument names a template, not a
+body.
+
+The removal families (`:channel_message`, `:pubsub`) collapse a whole call to the `:ok` its
+happy path returns, and only at the call's real arities, so every generated mutant still
+compiles; a piped form is left alone, since none of these calls returns its receiver. The
+families that produce several kinds declare variant labels, so a qualified
+`# mutare:ignore[pubsub:subscribe]` silences just one kind at a site.
 
 The `Plug.Conn` side of a controller action — `put_status`, `send_resp`, `put_session`,
 `put_resp_header`, `put_resp_cookie`, `halt` — is the base package's six families,

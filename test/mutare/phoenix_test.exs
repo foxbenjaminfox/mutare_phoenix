@@ -1,7 +1,7 @@
 defmodule Mutare.PhoenixTest do
   @moduledoc """
   The package's preset, its `:extensions` macro routing, and a cross-package integration
-  check: a realistic controller + plug surface mutated by the `mutare_plug` and
+  check: a realistic controller + channel + plug surface mutated by the `mutare_plug` and
   `mutare_phoenix` families alongside Mutare's built-ins, recording the expected family
   names and compiling as a single metamutant.
   """
@@ -26,11 +26,15 @@ defmodule Mutare.PhoenixTest do
   end
 
   describe "all/0" do
-    test "is the three families in order" do
+    test "is the seven families in order" do
       assert Mutare.Phoenix.all() == [
                Mutare.Phoenix.Redirect,
                Mutare.Phoenix.Body,
-               Mutare.Phoenix.Download
+               Mutare.Phoenix.Download,
+               Mutare.Phoenix.ChannelReply,
+               Mutare.Phoenix.ChannelMessage,
+               Mutare.Phoenix.PubSub,
+               Mutare.Phoenix.Token
              ]
     end
 
@@ -47,7 +51,7 @@ defmodule Mutare.PhoenixTest do
       specs = Mutare.Mutators.resolve([:builtins] ++ Mutare.Plug.all() ++ Mutare.Phoenix.all())
       names = Enum.map(specs, & &1.name)
 
-      assert Enum.take(names, -9) == [
+      assert Enum.take(names, -13) == [
                :plug_halt,
                :http_status,
                :plug_session,
@@ -56,7 +60,11 @@ defmodule Mutare.PhoenixTest do
                :resp_body,
                :redirect_status,
                :controller_body,
-               :download_disposition
+               :download_disposition,
+               :channel_reply,
+               :channel_message,
+               :pubsub,
+               :token
              ]
 
       # Spot-check the expansion across the built-in categories: an operator family,
@@ -168,6 +176,24 @@ defmodule Mutare.PhoenixTest do
       def export(conn, _params) do
         send_download(conn, {:binary, "a,b"}, filename: "r.csv", disposition: :attachment)
       end
+
+      def token(conn, %{"id" => id}) do
+        text(conn, Phoenix.Token.sign(conn, "user auth", id))
+      end
+    end
+
+    defmodule DemoWeb.RoomChannel do
+      use Phoenix.Channel
+
+      def join("room:" <> id, _payload, socket) do
+        Phoenix.PubSub.subscribe(Demo.PubSub, "room_events:" <> id)
+        {:ok, %{id: id}, socket}
+      end
+
+      def handle_in("new_msg", %{"body" => body}, socket) do
+        broadcast!(socket, "new_msg", %{body: body})
+        {:reply, :ok, socket}
+      end
     end
     """
 
@@ -180,15 +206,19 @@ defmodule Mutare.PhoenixTest do
         |> Enum.sort()
 
       assert names == [
+               :channel_message,
+               :channel_reply,
                :controller_body,
                :download_disposition,
                :http_status,
                :plug_halt,
                :plug_session,
+               :pubsub,
                :redirect_status,
                :resp_body,
                :resp_cookie,
-               :resp_header
+               :resp_header,
+               :token
              ]
     end
 

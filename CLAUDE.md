@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`mutare_phoenix` is an Elixir library of **custom [Mutare](https://hex.pm/packages/mutare) mutators** for the Phoenix controller surface — the `Phoenix.Controller` calls a controller action performs on the conn — plus the defensive `Mutare.CallRouting` extension that keeps Phoenix's compile-time macros from poisoning the metamutant build. It does not test Phoenix apps directly; it plugs into the Mutare mutation-testing engine. See `README.md` for the user-facing description and `examples/demo/README.md` for a worked walkthrough.
+`mutare_phoenix` is an Elixir library of **custom [Mutare](https://hex.pm/packages/mutare) mutators** for the Phoenix server-side surface — the `Phoenix.Controller` calls a controller action performs on the conn, `Phoenix.Channel` callback replies and outbound messages, `Phoenix.PubSub`, and `Phoenix.Token` — plus the defensive `Mutare.CallRouting` extension that keeps Phoenix's compile-time macros from poisoning the metamutant build. It does not test Phoenix apps directly; it plugs into the Mutare mutation-testing engine. See `README.md` for the user-facing description and `examples/demo/README.md` for a worked walkthrough.
 
 ## Commands
 
@@ -49,10 +49,16 @@ Registered in `lib/mutare/phoenix.ex` via `@families` / `all/0`:
 - `Mutare.Phoenix.Redirect` — `:redirect_status`, swaps explicit redirect `status:` atoms of `Phoenix.Controller.redirect/2` for a redirect-status sibling (curated `@status_swaps` table).
 - `Mutare.Phoenix.Body` — `:controller_body`, blanks the body of `json/2` (to `%{}`), `text/2`, and `html/2` (to `""`); its single-argument rewrite is an Overlap-covering mutation, so the built-in `:string` leaves on a literal text/html body are pruned automatically. `render/3` is deliberately out of scope (its argument is a template name, not a body).
 - `Mutare.Phoenix.Download` — `:download_disposition`, flips an explicit `disposition:` atom of `send_download/3` between `:attachment` and `:inline` (the only two Phoenix accepts; anything else raises, so the built-in `:atom` leaf there is a crash and gets pruned).
+- `Mutare.Phoenix.ChannelReply` — `:channel_reply`, a `Mutare.Mutator.Structural` return hook gated on `@behaviour Phoenix.Channel` (`context.behaviours`; `use Phoenix.Channel` injects it, visible through use expansion): drops the reply element of `{:ok, reply, socket}`, `{:reply, reply, socket}`, `{:stop, reason, reply, socket}`. Recognised by tuple shape in any function of the module, like the built-in `:genserver` and `mutare_phoenix_live_view`'s `:lv_reply` it mirrors; no `mutate/1`/`mutate/2` at all.
+- `Mutare.Phoenix.ChannelMessage` — `:channel_message`, removes `Phoenix.Channel.broadcast/3`, `broadcast!/3`, `broadcast_from/3`, `broadcast_from!/3`, `push/3`, `reply/2` by collapsing the call to `:ok`; variants `broadcast`/`push`/`reply`, tagged at production.
+- `Mutare.Phoenix.PubSub` — `:pubsub`, the same removal over `Phoenix.PubSub` (`subscribe/2,3`, `unsubscribe/2`, and every broadcast form at its real arities); variants `subscribe`/`unsubscribe`/`broadcast`.
+- `Mutare.Phoenix.Token` — `:token`, three kinds on `Phoenix.Token.sign/verify/encrypt/decrypt` (arities 3,4, pipe-aware): `scheme` renames a call to its sibling scheme via `rebuild` (`sign` ↔ `encrypt`, `verify` ↔ `decrypt`), `payload` blanks a minter's data (effective index 2) to `nil`, `expiry` swaps an explicit integer `max_age:` in a reader's options (effective index 3) to `:infinity` through `Options`. It declares `argument_marks/1` — `{:keyword, :max_age}` on `verify/4`/`decrypt/4` under the shared `:timeout` label — so the built-in `:integer`/`:atom` families leave the duration alone.
+
+`Mutare.Phoenix.Removal` (`@moduledoc false`) is the shared plumbing for the two removal families: a table `function => {real arities, label}` and `removed/4` — a `Calls.resolved_call_to/3` match plus arity guard → `Mutation.tagged(AST.literal(:ok), label)`, and `:skip` when piped (none of these calls returns its receiver, so there is no faithful `Function.identity()` pass-through, and piping into them is never idiomatic).
 
 `Mutare.Phoenix.Options` (`@moduledoc false`) is the shared keyword-options plumbing for the option families (`Redirect`, `Download`): `keyword_list/1` reads the pairs out of either written shape (bare trailing keywords or an explicit bracketed list) with a `rewrap` closure that restores the shape, `atom_literal/1` reads a literal atom value, and `swap_literal/2` swaps a value in place under the clean-meta rule.
 
-To add a family: implement the `Mutare.Mutator` behaviour, add the module to `@families` (and the `all/0` doctest, which asserts the exact list), export any newly matched function/arity from `test/support/phoenix_stubs.ex`, and add a test module mirroring the existing ones. `Plug.Conn` calls never belong here — those are `mutare_plug`. Flash atoms (`put_flash/3`'s `:info` / `:error`) are deliberately **not** a family: the built-in atom families already flip them (`:info → :mutare`, `:error → :ok`), so a test that never checks the flash kind is caught regardless.
+To add a family: implement the `Mutare.Mutator` behaviour, add the module to `@families` (and the `all/0` doctest, which asserts the exact list), export any newly matched function/arity from `test/support/phoenix_stubs.ex`, and add a test module mirroring the existing ones. `Plug.Conn` calls never belong here — those are `mutare_plug`. `Phoenix.Presence` is deliberately absent: its `track`/`untrack`/`update` are defined *in* the app's own `use Phoenix.Presence` module, so `Phoenix.Presence` never appears as a callee and name-based matching has nothing to key on (and Mutare's import reflection does not load target-project modules, so the callee's behaviours are not reliably inspectable either). Flash atoms (`put_flash/3`'s `:info` / `:error`) are deliberately **not** a family: the built-in atom families already flip them (`:info → :mutare`, `:error → :ok`), so a test that never checks the flash kind is caught regardless.
 
 ### The `:extensions` entry — `Mutare.Phoenix.call_routes/0`
 
@@ -72,7 +78,9 @@ A routing-only module belongs under `:extensions`, not `:mutators` (`Mutare.Muta
 
 ### `mutate/1` vs `mutate/2` (pipe awareness)
 
-`mutate/2` receives `%{pipe_mode: ...}` context; `mutate/1` is node-local with no pipe context. Both are optional (a family needs at least one producer), so implement exactly the one that fits how the swappable position behaves. Every family implements only `mutate/2`: the swapped position (an options list, a body) is a non-first effective argument whose visible index depends on pipe context, so a node-local `mutate/1` could never fire and is omitted.
+`mutate/2` receives `%{pipe_mode: ...}` context; `mutate/1` is node-local with no pipe context. Both are optional (a family needs at least one producer — a `Mutare.Mutator.Structural` hook counts), so implement exactly the one that fits how the swappable position behaves. Every call family implements only `mutate/2`: for the option/body families the swapped position is a non-first effective argument whose visible index depends on pipe context; for the removal families the piped form is deliberately skipped. `ChannelReply` implements neither — it produces only through `return_replacements/2`.
+
+Core never descends a plain module-body call with no `do` block (`@x 1 + 2`, `channel "room:*", RoomChannel`, `intercept [...]`) — only function bodies and `do` blocks — so those channel-side declarations need no `:skip` route; the router DSL needs one because `scope`/`pipeline` carry `do` blocks.
 
 ### Recurring AST conventions (apply to any new family)
 
@@ -93,10 +101,12 @@ Test files mirror `lib/` under `test/mutare/phoenix/`; `test/mutare/phoenix_test
 
 ## Scope — what lives elsewhere
 
-This package owns only the **`Phoenix.Controller`** surface and Phoenix's macro routing. Adjacent concerns are deliberately handled by other packages, and keeping the split clean matters (overlapping mutators double-fire on the same range):
+This package owns the **`Phoenix.Controller`**, **`Phoenix.Channel`**, **`Phoenix.PubSub`**, and **`Phoenix.Token`** surfaces and Phoenix's macro routing. Adjacent concerns are deliberately handled by other packages, and keeping the split clean matters (overlapping mutators double-fire on the same range):
 
 - **The `Plug.Conn` surface** (`halt`, `put_status`/`send_resp`/… statuses, session, headers, cookies, body) is the base `mutare_plug`. Conn-level and controller-level calls resolve to different modules, so the split is clean.
 - **The LiveView socket surface** (navigation, reply tuples, streams, pushed events, `send_update`) is the companion `mutare_phoenix_live_view`. Conn-level redirects (`Phoenix.Controller.redirect/2`) and socket-level ones (`Phoenix.LiveView.redirect/2`) resolve to different modules.
 - **Integer statuses** (`status: 302`) are left to Mutare's built-in literal family; `:redirect_status` only swaps *atom* statuses. Likewise the option families mutate only an *explicit* literal option — a call relying on Phoenix's default is left alone (the package does not add options that were not written).
-- **Flash kinds** (`put_flash/3`) are covered by the built-in atom families (`:info → :mutare`, `:error → :ok`) and deliberately not duplicated here.
+- **Flash kinds** (`put_flash/3`) are covered by the built-in atom families (`:info → :mutare`, `:error → :ok`) and deliberately not duplicated here. Likewise a channel reply's `:ok`/`:error` status is the built-in `:convention` family, and the event/topic strings are the built-in `:string` family.
+- **`Phoenix.Presence`** is not covered (see "To add a family" above for why).
+- **Token salts** are not a `:token` axis: a literal salt is the built-in `:string` family, and a salt in a module attribute is compile-time data core never descends.
 - **Crashing atom swaps** in status positions are left to the built-in `:atom`/`:convention` families and then pruned by Overlap, so this package never emits a knowingly-crashing mutant.

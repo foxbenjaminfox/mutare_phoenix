@@ -80,7 +80,7 @@ defp deps do
   [
     {:mutare, "~> 0.1", only: [:dev, :test], runtime: false},
     {:mutare_plug, "~> 0.1", only: [:dev, :test], runtime: false},
-    {:mutare_phoenix, "~> 0.1", only: [:dev, :test], runtime: false}
+    {:mutare_phoenix, "~> 0.2", only: [:dev, :test], runtime: false}
   ]
 end
 ```

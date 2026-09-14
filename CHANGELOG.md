@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-14
+
 ### Added
 
 - `Mutare.Phoenix.ChannelReply` (`:channel_reply`) — drops replies from
@@ -58,5 +60,6 @@ families (`:plug_halt`, `:http_status`, `:plug_session`, `:resp_header`,
 - `Mutare.Phoenix.all/0` for splicing the Phoenix families into a `:mutators`
   list, composing with `Mutare.Plug.all/0`.
 
-[Unreleased]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/foxbenjaminfox/mutare_phoenix/releases/tag/v0.1.0

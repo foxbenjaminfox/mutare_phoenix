@@ -7,10 +7,9 @@ defmodule Demo.MixProject do
   #
   #     mix mutare examples/demo
   #
-  # It models a thin Phoenix request surface — an auth plug and a few controller
-  # actions — over a tiny stand-in for `Plug.Conn` / `Phoenix.Controller` (so the
-  # demo needs no real Phoenix). The custom mutators match on module *name*, so the
-  # mutations are exactly what they would be against a real app.
+  # It models an auth plug, controller actions, a room channel, report notifications,
+  # and invitation tokens over small framework stand-ins (so the demo needs no real
+  # Phoenix). The custom mutators match on module *name* and channel behaviour.
   def project do
     [
       app: :demo,

@@ -10,9 +10,9 @@ for pkg <- ["mutare_plug", "mutare_phoenix"],
     ebin <- Path.wildcard(Path.expand("_build/*/lib/#{pkg}/ebin")),
     do: Code.append_path(String.to_charlist(ebin))
 
-# Scope mutation to `lib/demo` (the app code), leaving the tiny `Plug.Conn` /
-# `Phoenix.Controller` stand-in at `lib/phoenix_surface.ex` unmutated, and enable only the
-# two packages' families so every survivor is a conn-transform gap. A real project would
+# Scope mutation to `lib/demo` (the app code), leaving the framework stand-ins in
+# `lib/*_surface.ex` unmutated, and enable only the two packages' families so every
+# survivor demonstrates a Plug or Phoenix test gap. A real project would
 # keep Mutare's built-ins on too, by adding the `:builtins` family:
 #
 #     [

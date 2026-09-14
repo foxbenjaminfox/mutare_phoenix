@@ -7,35 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The package now covers the Phoenix server-side surface beyond controllers:
-channel callback replies, channel outbound messages, PubSub, and tokens.
-
 ### Added
 
-- `Mutare.Phoenix.ChannelReply` (`:channel_reply`) — drops the reply element
-  of a `Phoenix.Channel` callback return (`{:ok, reply, socket}` →
-  `{:ok, socket}`, `{:reply, reply, socket}` → `{:noreply, socket}`,
-  `{:stop, reason, reply, socket}` → `{:stop, reason, socket}`), gated on
-  `@behaviour Phoenix.Channel` ("does any test check the reply?").
-- `Mutare.Phoenix.ChannelMessage` (`:channel_message`) — removes a
-  `Phoenix.Channel` outbound message (`broadcast/3` and its `!`/`_from`
-  siblings, `push/3`, `reply/2`), collapsing the call to `:ok`; variant labels
-  `broadcast`, `push`, `reply`.
-- `Mutare.Phoenix.PubSub` (`:pubsub`) — removes a `Phoenix.PubSub` `subscribe`,
-  `unsubscribe`, or broadcast call (every `broadcast`/`broadcast_from`/
-  `local_broadcast`/`direct_broadcast` form), collapsing it to `:ok`; variant
-  labels `subscribe`, `unsubscribe`, `broadcast`.
-- `Mutare.Phoenix.Token` (`:token`) — swaps a `Phoenix.Token` call for its
-  sibling scheme (`sign` ↔ `encrypt`, `verify` ↔ `decrypt`; variant `scheme`),
-  blanks a `sign`/`encrypt` payload to `nil` (`payload`), and turns an explicit
-  integer `max_age:` of `verify`/`decrypt` into `:infinity` (`expiry`). The
-  `max_age:` position is marked with the shared `:timeout` label, so the
-  built-in integer/atom families leave the duration literal alone.
+- `Mutare.Phoenix.ChannelReply` (`:channel_reply`) — drops replies from
+  channel return tuples in modules implementing `Phoenix.Channel`, exposing
+  tests that do not check join payloads or callback replies.
+- `Mutare.Phoenix.ChannelMessage` (`:channel_message`) — replaces channel
+  broadcast, push, and deferred reply calls with `:ok`, exposing tests that
+  do not assert outbound messages.
+- `Mutare.Phoenix.PubSub` (`:pubsub`) — replaces subscription, unsubscription,
+  and broadcast calls with `:ok`, exposing tests that do not check message
+  delivery or subscription changes.
+- `Mutare.Phoenix.Token` (`:token`) — swaps `sign` ↔ `encrypt` and
+  `verify` ↔ `decrypt`, replaces token payloads with `nil`, and disables
+  expiry by replacing explicit integer `max_age:` values with `:infinity`.
+  Marks `max_age:` as a timeout so built-in integer and atom mutators leave
+  it alone.
+- Variant-specific ignore support for channel message, PubSub, and token
+  mutations, such as `# mutare:ignore[token:expiry]`.
 
 ### Changed
 
-- `Mutare.Phoenix.all/0` now returns seven families: the four above appended
-  after the controller ones.
+- `Mutare.Phoenix.all/0` now includes the four new families alongside the
+  three controller families, enabling them in configurations using this preset.
 
 ## [0.1.0] - 2026-09-07
 

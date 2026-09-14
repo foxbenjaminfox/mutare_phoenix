@@ -11,9 +11,9 @@ mix mutare examples/demo
 
 | Example | Surface | What it demonstrates |
 | --- | --- | --- |
-| [`demo`](demo/) | Plug + controller | A forgotten `halt` (`:plug_halt`) and an unasserted status (`:http_status`) — both `mutare_plug` families — and an unasserted redirect status (`:redirect_status`, this package): survivors in all three, plus the kills that prove the families catch what *is* asserted. |
+| [`demo`](demo/) | Plug, controllers, channels, PubSub, tokens | Survivors in all seven Phoenix families plus Plug halt and status, alongside kills where the relevant behaviour is asserted. The walkthrough explains the missing assertions for replies, message delivery, token round-trips, payloads, and expiry. |
 
-The project has **partial test coverage on purpose**: each run surfaces real survivors, and
-the `README.md` walks through the test-quality gap behind each one. The recurring lesson is
-the packages' thesis — when a function's behaviour *is* its conn transformation, a test that
-asserts "something happened" but not *which* transformation leaves a gap Mutare will find.
+The project has **partial test coverage on purpose**, following the same pattern as the
+Mutare, Plug, LiveView, and Ecto examples: a passing suite with deliberate gaps, and a
+walkthrough of the survivors. This demo kills 7 of 25 mutants and leaves 18 survivors.
+The [walkthrough](demo/README.md) connects each survivor to its missing assertion.

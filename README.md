@@ -118,15 +118,18 @@ leaves there are pruned automatically and one clean "is the body read?" mutant r
 ## Example
 
 [`examples/demo`](https://github.com/foxbenjaminfox/mutare_phoenix/tree/HEAD/examples/demo) is
-a standalone mini-project — an auth plug and a few controller actions over a tiny
-`Plug.Conn` / `Phoenix.Controller` stand-in — with deliberate test gaps that surface
-survivors in the halt and status families (from `mutare_plug`) and the redirect, body, and
-download families (this package). From the repo root:
+a standalone mini-project with an auth plug, controller actions, a room channel,
+PubSub notifications, and invitation tokens over small framework stand-ins. Deliberate
+test gaps surface survivors in all seven Phoenix families, plus Plug halt and status.
+From the repo root:
 
 ```
 mix compile
 mix mutare examples/demo
 ```
+
+Like the companion packages' examples, the demo keeps its test suite deliberately
+partial. Its walkthrough explains each survivor and the assertion that closes the gap.
 
 ## Scope
 

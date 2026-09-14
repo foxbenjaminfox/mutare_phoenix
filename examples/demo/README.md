@@ -1,63 +1,48 @@
-# Demo: a Phoenix request surface
+# Demo: Phoenix requests, messages, and tokens
 
-A standalone mini-project modelling the **conn-transform surface** of a Phoenix app — an
-auth plug and a few controller actions — over a tiny stand-in for `Plug.Conn` /
-`Phoenix.Controller` (so it needs no real Phoenix). The custom mutators match calls by
-module *name*, so the mutations are exactly what they'd be against a real app.
+A standalone mini-project with an auth plug, controller actions, a room channel,
+PubSub notifications, and invitation tokens. Small framework stand-ins keep it
+dependency-free. The mutators recognise the same module names and channel behaviour
+as in a real Phoenix app; only the application code in `lib/demo` is mutated.
 
-A plug or action returns a *transformed conn*, so its whole contract is **which
-conn-transforming call ran** — the status it set, where it redirected, what it rendered,
-whether it halted. These are precisely the calls a suite tends to under-assert, and each
-gap becomes a survivor.
+Like the other Mutare packages' examples, this demo has a single, deliberately partial
+test suite. Its survivors expose missing assertions; its kills show which behaviours
+the tests already check. The walkthrough below explains how to close each gap.
+
+## Running
 
 From the repo root (compile the package once so both packages' mutators are loadable —
 `mutare_plug`'s families come in through the dependency):
 
-```
+```sh
 mix compile
 mix mutare examples/demo
 ```
 
-It scans 12 mutants across 2 files and reports seven survivors across the five visible gaps
-below, for a mutation score of 41.7%:
+The run scans **25 mutants across five files**. The observed results are:
 
-```
-lib/demo/auth.ex:17  [plug_halt, in-place]  SURVIVED
--      |> Plug.Conn.halt()
-+      |> Elixir.Function.identity()
+| Families | Killed | Survived |
+| --- | --- | --- |
+| Plug and controller families | 5 | 7 |
+| `:channel_reply` | 1 | 2 |
+| `:channel_message` | 0 | 3 |
+| `:pubsub` | 0 | 3 |
+| `:token` | 1 | 3 |
+| **Total (28.0%)** | **7** | **18** |
 
-lib/demo/page_controller.ex:17  [http_status, in-place]  SURVIVED
--    |> Plug.Conn.put_status(:created)
-+    |> Plug.Conn.put_status(:ok)
-
-lib/demo/page_controller.ex:17  [http_status, in-place]  SURVIVED
--    |> Plug.Conn.put_status(:created)
-+    |> Plug.Conn.put_status(:accepted)
-
-lib/demo/page_controller.ex:23  [redirect_status, in-place]  SURVIVED
--    Phoenix.Controller.redirect(conn, to: "/login", status: :found)
-+    Phoenix.Controller.redirect(conn, to: "/login", status: :moved_permanently)
-
-lib/demo/page_controller.ex:23  [redirect_status, in-place]  SURVIVED
--    Phoenix.Controller.redirect(conn, to: "/login", status: :found)
-+    Phoenix.Controller.redirect(conn, to: "/login", status: :see_other)
-
-lib/demo/page_controller.ex:28  [controller_body, in-place]  SURVIVED
--    Phoenix.Controller.text(conn, "pong")
-+    Phoenix.Controller.text(conn, "")
-
-lib/demo/page_controller.ex:33  [download_disposition, in-place]  SURVIVED
-     Phoenix.Controller.send_download(conn, {:binary, "id,name\n1,welcome\n"},
-       filename: "report.csv",
--      disposition: :attachment
-+      disposition: :inline
-     )
-
-mutation score: 41.7%  (5 killed, 7 survived, 12 total)
+```text
+mutation score: 28.0%  (7 killed, 18 survived, 25 total)
 ```
 
-Each survivor is a real test-quality gap. Grouped by family — the first two are `mutare_plug`
-families composed in through `Mutare.Plug.all/0`, the rest are this package's:
+To run just the tests, from `examples/demo`:
+
+```sh
+mix test                    # 18 tests, 0 failures
+```
+
+## Plug and controller gaps
+
+The first two families come from `mutare_plug`; the rest belong to this package:
 
 - **`:plug_halt` — the forgotten halt** (`Demo.Auth`). The auth plug sets `401` *and*
   halts. The test asserts the `401` (so the `:http_status` mutant `:unauthorized →
@@ -87,9 +72,124 @@ families composed in through `Mutare.Plug.all/0`, the rest are this package's:
   test checks only that the filename reached the `content-disposition` header. So flipping
   it to `:inline` (display in the browser instead) is invisible.
 
-The lesson is the packages' whole thesis: when a function's behaviour *is* its conn
-transformation, asserting "something happened" isn't enough — you have to assert *which*
-transformation, with *what* arguments. Mutare turns every place you didn't into a survivor.
+To close these five gaps, add the following assertions after the existing calls in their
+respective tests:
+
+| Test | Missing assertion |
+| --- | --- |
+| Anonymous request | `assert conn.halted` |
+| Create | `assert conn.status == :created` |
+| Login | `assert conn.status == :found` |
+| Ping | `assert conn.resp_body == "pong"` |
+| Export | `assert value == ~s(attachment; filename="report.csv")` |
+
+## Channel replies and outbound messages
+
+[`Demo.RoomChannel`](lib/demo/room_channel.ex) returns room metadata when joining,
+echoes a ping, acknowledges leaving, broadcasts chat messages, pushes presence,
+and sends a deferred receipt reply.
+
+The [tests](test/demo/room_channel_test.exs) check only that joining succeeds,
+leaving stops the channel, and outbound operations return `{:noreply, socket}`.
+Dropping a join or stop reply preserves those success/stop tags; removing a
+broadcast, push, or deferred reply preserves the callback return. All five mutations
+survive. The ping test already checks its reply, so its `:channel_reply` mutant is killed.
+
+Checking the exact join and stop reply tuples closes the two callback gaps:
+
+```elixir
+assert RoomChannel.join("room:lobby", %{}, socket) ==
+         {:ok, %{room_id: "lobby"}, socket}
+
+assert RoomChannel.handle_in("leave", %{}, socket) ==
+         {:stop, :normal, {:ok, %{left: true}}, socket}
+```
+
+Checking delivery closes the three outbound-message gaps. Add these calls and assertions
+to tests using the existing socket setup:
+
+```elixir
+RoomChannel.handle_in("message", %{body: "hello"}, socket)
+assert_receive {:broadcast, "room:lobby", "message", %{body: "hello"}}
+
+RoomChannel.handle_in("presence", %{}, socket)
+assert_receive {:push, "presence", %{online: 1}}
+
+ref = make_ref()
+RoomChannel.handle_info({:receipt_ready, {self(), ref}, 7}, socket)
+assert_receive {:reply, ^ref, {:ok, %{receipt_id: 7}}}
+```
+
+Replacing an outbound call with `:ok` now fails the corresponding receive assertion.
+
+## PubSub subscriptions and delivery
+
+[`Demo.Notifications`](lib/demo/notifications.ex) watches report updates, stops
+watching them, and publishes an update. The [tests](test/demo/notifications_test.exs)
+check only `:ok`, which is also what the removal mutants return.
+
+To close these gaps, exercise each effect independently:
+
+- After `watch/2`, broadcast a fixture message and assert it arrives.
+- After `unwatch/2`, broadcast a fixture message and assert it does not arrive.
+- Before `published/2`, subscribe the test process and assert the update arrives.
+
+For example, the unsubscription test can check that delivery stops:
+
+```elixir
+Phoenix.PubSub.subscribe(Demo.PubSub, "report:7")
+Notifications.unwatch(Demo.PubSub, 7)
+Phoenix.PubSub.broadcast(Demo.PubSub, "report:7", {:published, 7})
+refute_receive {:published, 7}, 0
+```
+
+Use `Phoenix.PubSub` directly for fixture setup and broadcasts so each added test
+isolates one application operation. Test code is outside the mutation target. The
+existing setup starts a supervised Registry that is stopped after each test, so
+subscriptions cannot leak between tests. The stand-in sends synchronously, allowing
+the unsubscription test to inspect the mailbox immediately without a timing guess.
+
+## Token scheme, payload, and expiry
+
+[`Demo.Invites`](lib/demo/invites.ex) signs a user id and accepts invitations for one
+hour. The [tests](test/demo/invites_test.exs) check that issuing returns a
+binary and that the reader accepts an independently signed, fresh fixture. This
+kills the reader's `verify` → `decrypt` mutation, but leaves three survivors:
+
+- Issuing with `encrypt` still returns a binary; no test reads that issued token.
+- Issuing with a `nil` payload still returns a binary; no test checks its user id.
+- Changing `max_age: 3600` to `max_age: :infinity` still accepts the fresh fixture.
+
+Round-trip an issued token and check its user id to kill both issuing mutations:
+
+```elixir
+token = Invites.issue(@context, 7)
+assert Invites.accept(@context, token) == {:ok, 7}
+```
+
+Present an expired token to kill the expiry mutation:
+
+```elixir
+token = Phoenix.Token.sign(@context, "invite", 7,
+  signed_at: System.system_time(:second) - 7200)
+assert Invites.accept(@context, token) == {:error, :expired}
+```
+
+Backdating through the
+[`signed_at:` option](https://hexdocs.pm/phoenix/Phoenix.Token.html#sign/4)
+avoids sleeping or testing close to the expiry boundary.
+
+## What the stand-ins model
+
+`lib/phoenix_surface.ex` models conn transformations. `lib/messaging_surface.ex`
+delivers BEAM messages and uses a duplicate-key Registry for local subscriptions;
+it does not model WebSocket transport or distributed PubSub. In a real Phoenix
+channel test, use the corresponding `Phoenix.ChannelTest` assertions.
+
+`lib/token_surface.ex` encodes the scheme, context, salt, payload, and timestamp,
+then checks them when reading. **It does not sign or encrypt anything** and must
+never be used for authentication. Its role is to make scheme, payload, and expiry
+mutations observable in this dependency-free demo.
 
 > Why `:ok → :error` (or `:mutare`) doesn't already cover `:http_status`, `:redirect_status`,
 > or `:download_disposition`: in those positions both of Mutare's built-in atom swaps

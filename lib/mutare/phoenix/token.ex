@@ -1,44 +1,44 @@
 defmodule Mutare.Phoenix.Token do
   @moduledoc """
-  `:token` — mutates the `Phoenix.Token` calls that mint and read signed or encrypted
+  `:token` — mutates the `Phoenix.Token` calls that generate and read signed or encrypted
   tokens. Three kinds, each a variant label:
 
   **`scheme`** swaps the call for its sibling scheme — `sign/3,4` ↔ `encrypt/3,4`,
-  `verify/3,4` ↔ `decrypt/3,4` — so a token minted at the mutated site no longer round-trips
-  through its partner:
+  `verify/3,4` ↔ `decrypt/3,4` — so a token generated at the mutated site can no longer be
+  read by the corresponding `verify` or `decrypt` call:
 
       Phoenix.Token.sign(endpoint, "user auth", user.id)     ->  Phoenix.Token.encrypt(...)
       Phoenix.Token.verify(endpoint, "user auth", token)     ->  Phoenix.Token.decrypt(...)
 
   A survivor means no test ever verifies a token this site signed (or decrypts one it
-  encrypted, or feeds a real token into this reader) — the email is asserted to contain a
+  encrypted, or passes a real token to this reader) — the email is asserted to contain a
   link, say, and the link is never followed.
 
   **`payload`** blanks the data a `sign`/`encrypt` call embeds, to `nil`:
 
       Phoenix.Token.sign(endpoint, "user auth", user.id)     ->  Phoenix.Token.sign(endpoint, "user auth", nil)
 
-  A survivor means the token still verifies but no test checks *what* it carries — a
+  A survivor means the token still verifies but no test checks its payload — a
   `{:ok, _} = verify(...)` that never compares the payload.
 
   **`expiry`** disables the explicit `max_age:` of a `verify`/`decrypt` call:
 
       Phoenix.Token.verify(endpoint, salt, token, max_age: 86_400)  ->  max_age: :infinity
 
-  A survivor means no test presents an expired token. Only an explicit integer literal is
-  mutated; a call relying on Phoenix's default (one day), or passing a variable or
-  `:infinity`, is left alone. The position is marked with the shared `:timeout` label
-  (`c:Mutare.Mutator.argument_marks/1`), so Mutare's built-in `:integer` family leaves the
-  duration literal alone — this kind owns the expiry question, and an `86_400 → 86_401`
-  off-by-one there is the near-unkillable noise that family's own timeout table exists to
-  avoid (and `:atom` leaves an explicit `:infinity` alone for the same reason).
+  A survivor means no test checks that an expired token is rejected. Only an explicit
+  integer literal is mutated; a call relying on Phoenix's default (one day), or passing a
+  variable or `:infinity`, is left alone. The position is marked with the shared `:timeout` label
+  (`c:Mutare.Mutator.argument_marks/1`), so Mutare's built-in `:integer` family skips the
+  duration literal. The `expiry` mutation tests whether expiry is enforced; an off-by-one
+  change such as `86_400 → 86_401` would be difficult to detect reliably in a test.
+  The built-in `:atom` family also skips an explicit `:infinity` in this position.
 
   Suppress one kind with `# mutare:ignore[token:expiry]`, or the whole family with
-  `# mutare:ignore[token]`. The salt is not this family's axis: a literal salt is Mutare's
-  built-in `:string` family, and a salt held in a module attribute is compile-time data core
-  never mutates.
+  `# mutare:ignore[token]`. This family does not mutate the salt: Mutare's built-in
+  `:string` family mutates literal salts, and a salt stored in a module attribute is
+  compile-time data that Mutare never mutates.
 
-  Only the real arities fire — 3 and 4 for all four calls — so a name-matched call of any
+  Only the defined arities match — 3 and 4 for all four calls — so a name-matched call of any
   other arity (reachable only by an explicit qualifier) is left alone, keeping every
   metamutant compiling. The context argument (an endpoint, conn, or socket) is the first
   effective argument, so a piped call (`endpoint |> Phoenix.Token.sign(salt, data)`) is

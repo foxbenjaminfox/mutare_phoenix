@@ -1,7 +1,7 @@
 defmodule Demo.PageController do
   @moduledoc """
-  A few controller actions, each performing one conn transformation whose correctness
-  lives entirely in *which* call ran — the status it set.
+  Controller actions with explicit response statuses, bodies, redirects, and downloads
+  for tests to check.
   """
 
   @doc "Render a welcome payload with an explicit 200."
@@ -11,7 +11,7 @@ defmodule Demo.PageController do
     |> Phoenix.Controller.json(%{message: "welcome"})
   end
 
-  @doc "Create a record and answer 201 Created."
+  @doc "Create a record and respond with 201 Created."
   def create(conn, _params) do
     conn
     |> Plug.Conn.put_status(:created)
@@ -23,7 +23,7 @@ defmodule Demo.PageController do
     Phoenix.Controller.redirect(conn, to: "/login", status: :found)
   end
 
-  @doc "Answer a liveness probe with a fixed text body."
+  @doc "Respond to a liveness probe with a fixed text body."
   def ping(conn, _params) do
     Phoenix.Controller.text(conn, "pong")
   end

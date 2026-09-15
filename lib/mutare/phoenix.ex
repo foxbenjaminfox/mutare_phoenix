@@ -3,8 +3,8 @@ defmodule Mutare.Phoenix do
   Custom [Mutare](https://hex.pm/packages/mutare) mutators for the Phoenix server-side
   surface — the `Phoenix.Controller` calls a controller action performs on the conn, the
   `Phoenix.Channel` replies and outbound messages, `Phoenix.PubSub`, and `Phoenix.Token` —
-  plus the defensive macro routing that keeps Phoenix's compile-time macros from poisoning
-  the metamutant build.
+  plus macro routing that excludes Phoenix's compile-time macros from mutation to prevent
+  metamutant compilation failures.
 
   This package builds on `mutare_plug` the way `phoenix` builds on `plug`: it depends on it,
   so the `Plug.Conn` families (`Mutare.Plug.all/0`) are on your code path too, ready to
@@ -41,7 +41,7 @@ defmodule Mutare.Phoenix do
     * `Mutare.Phoenix.PubSub` — `:pubsub`, removes a `Phoenix.PubSub` `subscribe`,
       `unsubscribe`, or broadcast call, collapsing it to `:ok`.
     * `Mutare.Phoenix.Token` — `:token`, swaps a `Phoenix.Token` call for its sibling
-      scheme (`sign` ↔ `encrypt`, `verify` ↔ `decrypt`), blanks a minted token's payload to
+      scheme (`sign` ↔ `encrypt`, `verify` ↔ `decrypt`), blanks a generated token's payload to
       `nil`, and turns an explicit `max_age:` into `:infinity`.
 
   It does **not** include the `mutare_plug` families; compose `Mutare.Plug.all/0` explicitly
@@ -61,7 +61,7 @@ defmodule Mutare.Phoenix do
       activate;
     * `Phoenix.Component.sigil_H/2` (`~H`), because HEEx sigil arguments must remain
       compile-time literals — left unregistered, Mutare's imported-call witness would splice
-      an unreachable `sigil_H(arg1, arg2)` that Phoenix rejects at compile time, sinking the
+      an unreachable `sigil_H(arg1, arg2)` that Phoenix rejects at compile time, failing the
       whole metamutant build before poison recovery can isolate a single mutant.
 
   Mutations *around* a `~H` expression (for example a `render/1` `:return_value` mutant)

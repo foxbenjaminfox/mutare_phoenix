@@ -2,14 +2,14 @@ defmodule Mutare.Phoenix.Body do
   @moduledoc """
   `:controller_body` — blanks a rendered response body: the data argument of
   `Phoenix.Controller.json/2` becomes `%{}`, and that of `text/2` and `html/2` becomes
-  `""`. A surviving mutant means no test reads the response body — the action answered,
-  with the right status and content type, and nothing checked what it said.
+  `""`. A surviving mutant means the tests still pass with an empty response body:
+  the status and content type are unchanged, and no assertion detects the missing content.
 
       json(conn, %{id: user.id})        # → json(conn, %{})
       text(conn, "pong")                # → text(conn, "")
       conn |> html(render_page(page))   # → conn |> html("")
 
-  The blank is the emptiest value each renderer still sends cleanly: `%{}` encodes to
+  Each replacement is a valid empty body for its renderer: `%{}` encodes to
   `{}` — a well-formed, empty JSON document — while `""` is a `text`/`html` body with
   nothing in it. A body that is already that blank literal is left alone (the mutant would
   change nothing).
@@ -22,9 +22,8 @@ defmodule Mutare.Phoenix.Body do
   Because the mutation is the original call with exactly the body argument substituted,
   `Mutare.Transform.Overlap` treats it as covering that node: on a *literal* `text`/`html`
   body the built-in `:string` leaves (`""`/`"mutare"`) are pruned automatically, so this
-  family supersedes them rather than double-firing on the same range. A `json` map
-  literal's *entries* are descendants, not the body node, so the built-in mutators keep
-  their own mutants inside it.
+  family replaces those mutations at the same range. A `json` map literal's *entries*
+  are descendants, not the body node, so built-in mutations inside the map are retained.
   """
   @behaviour Mutare.Mutator
 

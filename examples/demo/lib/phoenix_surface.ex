@@ -32,7 +32,7 @@ defmodule Phoenix.Controller do
     %{conn | status: Keyword.get(opts, :status, :found), resp_body: Keyword.fetch!(opts, :to)}
   end
 
-  @doc "Send a binary as a download, naming the file and telling the browser to save or show it."
+  @doc "Send a binary as a download, specifying the filename and whether to save or display it."
   def send_download(%Conn{} = conn, {:binary, contents}, opts) do
     disposition = Keyword.get(opts, :disposition, :attachment)
     filename = Keyword.fetch!(opts, :filename)

@@ -7,9 +7,9 @@
 
 Custom [Mutare](https://hex.pm/packages/mutare) mutators for the **Phoenix server-side surface** —
 the `Phoenix.Controller` calls a controller action performs on the conn, the `Phoenix.Channel`
-replies and outbound messages, `Phoenix.PubSub`, and `Phoenix.Token` — plus the defensive
-macro routing that keeps Phoenix's compile-time macros (the `Phoenix.Router` DSL, `~H`) from
-poisoning the metamutant build.
+replies and outbound messages, `Phoenix.PubSub`, and `Phoenix.Token` — plus macro routing
+that excludes Phoenix's compile-time macros (the `Phoenix.Router` DSL, `~H`) from mutation
+to prevent metamutant compilation failures.
 
 A controller action returns a *transformed conn*, so its whole contract is **which
 conn-transforming call ran** — the status it set, where it redirected, whether it halted.
@@ -33,11 +33,11 @@ ones, a `Phoenix.PubSub` one, and a `Phoenix.Token` one:
 | --- | --- | --- | --- |
 | `Mutare.Phoenix.Redirect` | `:redirect_status` | swaps the explicit atom `status:` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling (`:found → :see_other`, `:moved_permanently → :permanent_redirect`) | no test pins the exact redirect status |
 | `Mutare.Phoenix.Body` | `:controller_body` | blanks the body argument of `Phoenix.Controller.json/2` to `%{}` and of `text/2` / `html/2` to `""` | no test reads the rendered body |
-| `Mutare.Phoenix.Download` | `:download_disposition` | flips the explicit `disposition:` option of `Phoenix.Controller.send_download/3` between `:attachment` and `:inline` | no test pins whether the browser is told to save or display the file |
+| `Mutare.Phoenix.Download` | `:download_disposition` | flips the explicit `disposition:` option of `Phoenix.Controller.send_download/3` between `:attachment` and `:inline` | no test checks whether the response specifies saving or displaying the file |
 | `Mutare.Phoenix.ChannelReply` | `:channel_reply` | drops the reply element of a `Phoenix.Channel` callback return: `{:ok, reply, socket}` → `{:ok, socket}`, `{:reply, reply, socket}` → `{:noreply, socket}`, `{:stop, reason, reply, socket}` → `{:stop, reason, socket}` (gated on `@behaviour Phoenix.Channel`) | no test checks the join reply or `assert_reply`s the `handle_in` reply |
 | `Mutare.Phoenix.ChannelMessage` | `:channel_message` | removes a `Phoenix.Channel` outbound message — `broadcast/3` and its `!`/`_from` siblings, `push/3`, `reply/2` — collapsing the call to `:ok` (variants `broadcast`, `push`, `reply`) | no test `assert_broadcast`s / `assert_push`es / `assert_reply`s the message |
 | `Mutare.Phoenix.PubSub` | `:pubsub` | removes a `Phoenix.PubSub` `subscribe`, `unsubscribe`, or broadcast call (every `broadcast`/`broadcast_from`/`local_broadcast`/`direct_broadcast` form), collapsing it to `:ok` (variants `subscribe`, `unsubscribe`, `broadcast`) | no test delivers a message on the topic and checks the subscriber reacted, or asserts a broadcast arrived |
-| `Mutare.Phoenix.Token` | `:token` | swaps a `Phoenix.Token` call for its sibling scheme (`sign` ↔ `encrypt`, `verify` ↔ `decrypt`; variant `scheme`), blanks a `sign`/`encrypt` payload to `nil` (`payload`), and turns an explicit integer `max_age:` of `verify`/`decrypt` into `:infinity` (`expiry`, with the position marked `:timeout` so the built-in integer family leaves the duration literal alone) | no test round-trips the token, checks the payload it carries, or presents an expired one |
+| `Mutare.Phoenix.Token` | `:token` | swaps a `Phoenix.Token` call for its sibling scheme (`sign` ↔ `encrypt`, `verify` ↔ `decrypt`; variant `scheme`), blanks a `sign`/`encrypt` payload to `nil` (`payload`), and turns an explicit integer `max_age:` of `verify`/`decrypt` into `:infinity` (`expiry`, with the position marked `:timeout` so the built-in integer family skips the duration literal) | no test round-trips the token, checks its payload, or passes an expired token to `verify`/`decrypt` |
 
 Each call family matches its call written directly (`Phoenix.Controller.redirect(conn, ...)`),
 aliased, or bare-imported (`redirect(conn, ...)`, the form `use MyAppWeb, :controller`
@@ -47,8 +47,8 @@ default, integer statuses, and variable values are left to other families or ski
 `render/3` is out of scope for `:controller_body` — its argument names a template, not a
 body.
 
-The removal families (`:channel_message`, `:pubsub`) collapse a whole call to the `:ok` its
-happy path returns, and only at the call's real arities, so every generated mutant still
+The removal families (`:channel_message`, `:pubsub`) collapse a whole call to its success
+value, `:ok`, and only at the call's defined arities, so every generated mutant still
 compiles; a piped form is left alone, since none of these calls returns its receiver. The
 families that produce several kinds declare variant labels, so a qualified
 `# mutare:ignore[pubsub:subscribe]` silences just one kind at a site.
@@ -65,13 +65,13 @@ neither its arguments nor the call itself is ever mutated: the `Phoenix.Router` 
 once at compile time under Mutare's compile-once model and a mutation there could never
 activate; and `Phoenix.Component.sigil_H/2` (`~H`), because HEEx sigil arguments must remain
 compile-time literals — left unregistered, Mutare's imported-call witness would splice an
-unreachable `sigil_H(arg1, arg2)` that Phoenix rejects at compile time, sinking the whole
+unreachable `sigil_H(arg1, arg2)` that Phoenix rejects at compile time, failing the whole
 metamutant build. Mutations *around* a `~H` expression, such as a `render/1` return-value
 mutant, remain available.
 
 ## Usage
 
-`mutare_phoenix` rides on the [Mutare](https://hex.pm/packages/mutare) engine and builds on
+`mutare_phoenix` uses the [Mutare](https://hex.pm/packages/mutare) engine and depends on
 `mutare_plug`, so add them as `:dev`/`:test` dependencies:
 
 ```elixir
@@ -107,7 +107,7 @@ mix mutare
 ## Why not the built-in atom mutators?
 
 In a status position, Mutare's built-in atom swaps (`:ok → :error` / `:mutare`) produce a
-value that **crashes** — an uninformative kill that tells you nothing about test quality.
+value that **crashes** — a kill that does not indicate whether tests check the status.
 `:redirect_status` and `:download_disposition` swap to *valid* siblings (Phoenix rejects any
 disposition other than `:attachment` / `:inline`), so a survivor means a genuine missing
 assertion rather than a crash, and Mutare's overlap pruning drops the redundant crashing
@@ -128,12 +128,12 @@ mix compile
 mix mutare examples/demo
 ```
 
-Like the companion packages' examples, the demo keeps its test suite deliberately
-partial. Its walkthrough explains each survivor and the assertion that closes the gap.
+Like the companion packages' examples, the demo has a deliberately partial test suite.
+Its walkthrough explains each survivor and the assertion that closes the gap.
 
 ## Scope
 
-The `Plug.Conn` families live in the base
+The `Plug.Conn` families are defined in the base
 [`mutare_plug`](https://hex.pm/packages/mutare_plug); LiveView is the companion
 `mutare_phoenix_live_view`, which builds on this package. Compose `Mutare.Plug.all/0`
 alongside `Mutare.Phoenix.all/0` (see "Usage") for the full conn + controller surface.

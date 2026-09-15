@@ -1,7 +1,7 @@
 defmodule Mutare.Phoenix.ChannelReply do
   @moduledoc """
   `:channel_reply` — drops the reply element of a `Phoenix.Channel` callback's return tuple,
-  reshaping it into a different but still valid return. Fires in modules that implement
+  reshaping it into a different but still valid return. Applies in modules that implement
   `@behaviour Phoenix.Channel` (which `use Phoenix.Channel` injects):
 
       join/3        {:ok, reply, socket}          ->  {:ok, socket}
@@ -10,20 +10,21 @@ defmodule Mutare.Phoenix.ChannelReply do
 
   A survivor means no test checks the dropped reply: the join payload (`{:ok, reply, socket}
   = subscribe_and_join(...)` matched as `{:ok, _, socket}`), or a `handle_in` reply the test
-  never `assert_reply`s. The returns that carry no reply — `{:noreply, socket}`,
+  never checks with `assert_reply`. The returns without a reply — `{:noreply, socket}`,
   `{:ok, socket}`, `{:stop, reason, socket}`, `{:noreply, socket, timeout}` — have nothing to
   drop and are left alone. Silence a site with `# mutare:ignore[channel_reply]`.
 
-  Recognised by tuple shape, independent of which function it sits in — like Mutare's
+  Recognised by tuple shape, independent of the enclosing function — like Mutare's
   built-in `:genserver` family and `mutare_phoenix_live_view`'s `:lv_reply`, whose
   `{:reply, payload, socket}` reshape this mirrors for the channel behaviour. A private helper
   in the channel module that returns a same-shaped `{:ok, value, socket}` is reshaped too;
-  silence such a site with the ignore comment. The reply's `:ok` / `:error` status is
-  Mutare's built-in `:convention` family, a different axis; the deferred `reply/2` call is
-  `:channel_message`.
+  silence such a site with the ignore comment. Mutare's built-in `:convention` family
+  mutates the reply's `:ok` / `:error` status separately; `:channel_message` mutates the
+  deferred `reply/2` call.
 
-  Under `--no-expand-uses` the `@behaviour` that `use Phoenix.Channel` injects is invisible,
-  so `:channel_reply` no-ops; a direct `@behaviour Phoenix.Channel` still works.
+  Under `--no-expand-uses`, Mutare does not detect the `@behaviour` injected by
+  `use Phoenix.Channel`, so `:channel_reply` produces no mutations unless the module
+  declares `@behaviour Phoenix.Channel` directly.
   """
   @behaviour Mutare.Mutator
   @behaviour Mutare.Mutator.Structural

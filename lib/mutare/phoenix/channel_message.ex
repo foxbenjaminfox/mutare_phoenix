@@ -1,7 +1,7 @@
 defmodule Mutare.Phoenix.ChannelMessage do
   @moduledoc """
   `:channel_message` — removes a `Phoenix.Channel` outbound-message call, collapsing it to
-  the `:ok` it returns on its happy path. Three kinds, each a variant label:
+  the `:ok` it returns on success. Three kinds, each a variant label:
 
       broadcast(socket, "new_msg", %{body: body})        ->  :ok     # broadcast
       broadcast!(socket, "new_msg", %{body: body})       ->  :ok     # broadcast
@@ -17,13 +17,13 @@ defmodule Mutare.Phoenix.ChannelMessage do
   `# mutare:ignore[channel_message:push]`, or the whole family with
   `# mutare:ignore[channel_message]`.
 
-  The *inline* reply — the `{:reply, reply, socket}` a `handle_in/3` returns — is the
-  `:channel_reply` family; this one owns only the calls. The `:ok` / `:error` status inside a
-  reply payload is Mutare's built-in `:convention` family, and the event string is the
-  built-in `:string` family: enabling them alongside this one mutates those axes
-  independently.
+  The `:channel_reply` family mutates *inline* replies — the `{:reply, reply, socket}`
+  tuples returned by `handle_in/3`; this family mutates only outbound-message calls.
+  Mutare's built-in `:convention` family mutates the `:ok` / `:error` status inside a
+  reply payload, and `:string` mutates the event string. Enable them alongside this
+  family to mutate each part independently.
 
-  Only the real arities fire — `broadcast/3` and its three siblings, `push/3`, `reply/2` —
+  Only the defined arities match — `broadcast/3` and its three siblings, `push/3`, `reply/2` —
   so a name-matched call of any other arity (reachable only by an explicit qualifier) is left
   alone, keeping every metamutant compiling. A piped call is left alone too: none of these
   returns the socket, so there is no faithful pass-through to substitute, and piping into

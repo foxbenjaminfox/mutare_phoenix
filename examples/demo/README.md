@@ -19,7 +19,7 @@ mix compile
 mix mutare examples/demo
 ```
 
-The run scans **25 mutants across five files**. The observed results are:
+Mutare finds **25 mutants across five files**. The observed results are:
 
 | Families | Killed | Survived |
 | --- | --- | --- |
@@ -51,7 +51,7 @@ The first two families come from `mutare_plug`; the rest belong to this package:
   The missing `assert conn.halted` is the gap; the classic authorization-bypass mutation.
 
 - **`:http_status` — the unasserted status** (`Demo.PageController.create`). `create`
-  answers `201 Created`, but its test checks only the response *body* (`%{id: 1}`), never
+  responds with `201 Created`, but its test checks only the response *body* (`%{id: 1}`), never
   the status. So swapping `:created` for another success (`:ok`, `:accepted`) is invisible.
   Two survivors, one per plausible sibling. (Contrast `index`, which **does** assert
   `:ok` — its `:created`/`:no_content` mutants are killed.)
@@ -61,9 +61,9 @@ The first two families come from `mutare_plug`; the rest belong to this package:
   target. So changing the status to another valid redirect status (`:moved_permanently`,
   `:see_other`) is invisible. Two survivors, one per plausible sibling.
 
-- **`:controller_body` — the unread body** (`Demo.PageController.ping`). `ping` answers
-  `"pong"`, but its test asserts only that the body *is text* (`is_binary`), never what it
-  says. So blanking it to `""` is invisible — the response was sent, and nothing checked
+- **`:controller_body` — the unread body** (`Demo.PageController.ping`). `ping` responds with
+  `"pong"`, but its test asserts only that the body *is text* (`is_binary`), without checking
+  its value. So blanking it to `""` is undetected — the response was sent, and nothing checked
   its content. (Contrast `index` and `create`, which **do** assert their JSON bodies — their
   `%{}` mutants are killed.)
 
@@ -124,8 +124,8 @@ Replacing an outbound call with `:ok` now fails the corresponding receive assert
 
 ## PubSub subscriptions and delivery
 
-[`Demo.Notifications`](lib/demo/notifications.ex) watches report updates, stops
-watching them, and publishes an update. The [tests](test/demo/notifications_test.exs)
+[`Demo.Notifications`](lib/demo/notifications.ex) subscribes to report updates,
+unsubscribes from them, and publishes an update. The [tests](test/demo/notifications_test.exs)
 check only `:ok`, which is also what the removal mutants return.
 
 To close these gaps, exercise each effect independently:
@@ -167,7 +167,7 @@ token = Invites.issue(@context, 7)
 assert Invites.accept(@context, token) == {:ok, 7}
 ```
 
-Present an expired token to kill the expiry mutation:
+Pass an expired token to `Invites.accept/2` to kill the expiry mutation:
 
 ```elixir
 token = Phoenix.Token.sign(@context, "invite", 7,
@@ -196,6 +196,6 @@ mutations observable in this dependency-free demo.
 > **crash** (`:error`/`:mutare` aren't valid statuses, and Phoenix rejects any disposition
 > but `:attachment`/`:inline`), an uninformative kill. These families swap to a *valid*
 > sibling so a survivor means a genuine missing assertion, not a crash — and Mutare's overlap
-> pruning drops the redundant crashing leaves. `:controller_body` earns its place the same
-> way against the built-in string family: on a literal body its whole-call blank supersedes
+> pruning drops the redundant crashing leaves. `:controller_body` also replaces overlapping
+> mutations from the built-in string family: on a literal body its whole-call blank supersedes
 > the `""`/`"mutare"` leaves, so one clean "is the body read?" mutant remains.

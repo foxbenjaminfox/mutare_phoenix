@@ -2,8 +2,8 @@ defmodule Mutare.Phoenix.Download do
   @moduledoc """
   `:download_disposition` — flips the explicit `:disposition` option of
   `Phoenix.Controller.send_download/3` between `:attachment` and `:inline`. A surviving
-  mutant means no test pins whether the browser is told to *save* the file or *display*
-  it — the type in the `content-disposition` header.
+  mutant means no test checks whether the response specifies *saving* or *displaying*
+  the file — the type in the `content-disposition` header.
 
       send_download(conn, {:file, path}, disposition: :attachment)   # → :inline
       conn |> send_download({:binary, csv}, filename: "r.csv", disposition: :inline)

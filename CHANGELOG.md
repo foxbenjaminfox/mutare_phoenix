@@ -23,8 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Mutare.Phoenix.Token` (`:token`) — swaps `sign` ↔ `encrypt` and
   `verify` ↔ `decrypt`, replaces token payloads with `nil`, and disables
   expiry by replacing explicit integer `max_age:` values with `:infinity`.
-  Marks `max_age:` as a timeout so built-in integer and atom mutators leave
-  it alone.
+  Marks `max_age:` as a timeout so built-in integer and atom mutators skip it.
 - Variant-specific ignore support for channel message, PubSub, and token
   mutations, such as `# mutare:ignore[token:expiry]`.
 
@@ -35,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-09-07
 
-Initial release. Builds on `mutare_plug`, which carries the `Plug.Conn`
+Initial release. Builds on `mutare_plug`, which provides the `Plug.Conn`
 families (`:plug_halt`, `:http_status`, `:plug_session`, `:resp_header`,
 `:resp_cookie`, `:resp_body`).
 
@@ -56,7 +55,7 @@ families (`:plug_halt`, `:http_status`, `:plug_session`, `:resp_header`,
   `:extensions`): routes the `Phoenix.Router` DSL (`get`/`scope`/…) `:skip`,
   so compile-time route definitions are left unmutated, and
   `Phoenix.Component.sigil_H/2` (`~H`) arguments as compile-time literals, so
-  HEEx never poisons the metamutant build.
+  HEEx arguments remain valid during metamutant compilation.
 - `Mutare.Phoenix.all/0` for splicing the Phoenix families into a `:mutators`
   list, composing with `Mutare.Plug.all/0`.
 

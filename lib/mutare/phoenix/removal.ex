@@ -17,16 +17,12 @@ defmodule Mutare.Phoenix.Removal do
   # The `:ok` removal for a call to `module` listed in `table`, tagged with the entry's
   # variant label; `:skip` for any other node.
   #
-  # A piped call is left alone: none of these calls returns its first argument, so the
-  # `Function.identity()` pass-through the socket-in socket-out families use would change the
-  # value — and a pipe into the socket/pubsub slot is never idiomatic for a call that yields
-  # `:ok` anyway.
+  # A pipe stage arrives as the direct call it is sugar for, and a constant replacement is
+  # delivered over the whole pipe (`s |> broadcast("a", %{})` → `:ok`), so the piped spelling
+  # gets the same mutant as the direct one.
   @doc false
-  @spec removed(Macro.t(), module(), table(), Mutare.Mutator.pipe_mode()) ::
-          :skip | [Mutation.t()]
-  def removed(_node, _module, _table, :piped), do: :skip
-
-  def removed(node, module, table, :unpiped) do
+  @spec removed(Macro.t(), module(), table()) :: :skip | [Mutation.t()]
+  def removed(node, module, table) do
     with {:ok, fun, args, _rebuild} <- Calls.resolved_call_to(node, module, Map.keys(table)),
          {arities, label} = Map.fetch!(table, fun),
          true <- length(args) in arities do

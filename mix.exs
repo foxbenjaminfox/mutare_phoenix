@@ -52,12 +52,12 @@ defmodule Mutare.Phoenix.MixProject do
       # `Mutare.Mutator` / `Mutare.CallRouting` and rides only its public extension
       # points (`Mutare.Calls`, `Mutare.AST`). Tests use `Mutare.Test` and
       # `Mutare.AST` for AST parse/render, so no direct `:sourceror` dep is needed.
-      {:mutare, "~> 0.1"},
+      {:mutare, "~> 0.4.0"},
       # The companion base package — this one **builds on** it: it depends on it and
       # composes its preset (`Mutare.Plug.all/0`) with the controller-level families on
       # top (mirroring how `phoenix` depends on `plug`). A consuming project lists both
       # as `:dev`/`:test` deps.
-      {:mutare_plug, "~> 0.1"},
+      {:mutare_plug, "~> 0.2"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}

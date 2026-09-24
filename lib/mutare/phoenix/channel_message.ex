@@ -25,10 +25,10 @@ defmodule Mutare.Phoenix.ChannelMessage do
 
   Only the defined arities match — `broadcast/3` and its three siblings, `push/3`, `reply/2` —
   so a name-matched call of any other arity (reachable only by an explicit qualifier) is left
-  alone, keeping every metamutant compiling. A piped call is left alone too: none of these
-  returns the socket, so there is no faithful pass-through to substitute, and piping into
-  them is never idiomatic. Matches direct (`Phoenix.Channel.broadcast(...)`), aliased, and
-  bare-imported (`use Phoenix.Channel`-injected) calls.
+  alone, keeping every metamutant compiling. A call written as a pipe stage
+  (`socket |> push("event", payload)`) gets the same mutant, reported over the whole pipe.
+  Matches direct (`Phoenix.Channel.broadcast(...)`), aliased, and bare-imported
+  (`use Phoenix.Channel`-injected) calls.
   """
   @behaviour Mutare.Mutator
 
@@ -54,10 +54,7 @@ defmodule Mutare.Phoenix.ChannelMessage do
   @spec variants() :: [String.t()]
   def variants, do: ~w(broadcast push reply)
 
-  # No `mutate/1`: the piped form is deliberately skipped, which needs the pipe context only
-  # `mutate/2` carries.
   @impl Mutare.Mutator
-  @spec mutate(Macro.t(), Mutare.Mutator.context()) :: :skip | [Mutation.t()]
-  def mutate(node, %{pipe_mode: pipe_mode}),
-    do: Removal.removed(node, Phoenix.Channel, @table, pipe_mode)
+  @spec mutate(Macro.t()) :: :skip | [Mutation.t()]
+  def mutate(node), do: Removal.removed(node, Phoenix.Channel, @table)
 end

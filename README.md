@@ -49,7 +49,7 @@ body.
 
 The removal families (`:channel_message`, `:pubsub`) collapse a whole call to its success
 value, `:ok`, and only at the call's defined arities, so every generated mutant still
-compiles; a piped form is left alone, since none of these calls returns its receiver. The
+compiles; a call written as a pipe stage is collapsed over the whole pipe. The
 families that produce several kinds declare variant labels, so a qualified
 `# mutare:ignore[pubsub:subscribe]` silences just one kind at a site.
 
@@ -78,8 +78,8 @@ mutant, remain available.
 # mix.exs
 defp deps do
   [
-    {:mutare, "~> 0.1", only: [:dev, :test], runtime: false},
-    {:mutare_plug, "~> 0.1", only: [:dev, :test], runtime: false},
+    {:mutare, "~> 0.4.0", only: [:dev, :test], runtime: false},
+    {:mutare_plug, "~> 0.2", only: [:dev, :test], runtime: false},
     {:mutare_phoenix, "~> 0.2", only: [:dev, :test], runtime: false}
   ]
 end

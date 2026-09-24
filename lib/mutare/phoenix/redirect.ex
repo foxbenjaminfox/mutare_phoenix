@@ -27,41 +27,35 @@ defmodule Mutare.Phoenix.Redirect do
     permanent_redirect: [:moved_permanently, :temporary_redirect]
   }
 
-  # The options are the second effective argument of `redirect/2`.
+  # The options are the second argument of `redirect/2`.
   @options_index 1
 
   @impl Mutare.Mutator
   @spec name() :: :redirect_status
   def name, do: :redirect_status
 
-  # No `mutate/1`: the options list is the second effective argument of `redirect/2`, so its
-  # visible index depends on pipe context.
   @impl Mutare.Mutator
-  @spec mutate(Macro.t(), Mutare.Mutator.context()) :: :skip | [Macro.t()]
-  def mutate(node, %{pipe_mode: pipe_mode}) do
+  @spec mutate(Macro.t()) :: :skip | [Macro.t()]
+  def mutate(node) do
     case Calls.resolved_call(node) do
       {[:Phoenix, :Controller], :redirect, args, rebuild} ->
-        redirect_status_mutations(args, pipe_mode, rebuild)
+        redirect_status_mutations(args, rebuild)
 
       _other ->
         :skip
     end
   end
 
-  # The `:status` option lives in the second effective argument of `redirect/2`:
-  # `redirect(conn, status: :found, to: "/")`, or visible index 0 in a pipe stage
-  # (`conn |> redirect(status: :found, to: "/")`). Anything that is not exactly
-  # `redirect/2`, or whose options are not a literal keyword list, is skipped.
-  @spec redirect_status_mutations(
-          [Macro.t()],
-          Mutare.Mutator.pipe_mode(),
-          (atom(), [Macro.t()] -> Macro.t())
-        ) :: :skip | [Macro.t()]
-  defp redirect_status_mutations(args, pipe_mode, rebuild) do
-    with 2 <- Mutare.Mutator.effective_arity(args, pipe_mode),
-         vis when is_integer(vis) <- Mutare.Mutator.visible_index(@options_index, pipe_mode),
-         [_ | _] = options <- status_option_swaps(Enum.at(args, vis)) do
-      Enum.map(options, fn opts -> rebuild.(:redirect, List.replace_at(args, vis, opts)) end)
+  # The `:status` option lives in the second argument of `redirect/2`:
+  # `redirect(conn, status: :found, to: "/")` — a pipe stage
+  # (`conn |> redirect(status: :found, to: "/")`) arrives as that same call. Anything that
+  # is not exactly `redirect/2`, or whose options are not a literal keyword list, is skipped.
+  @spec redirect_status_mutations([Macro.t()], (atom(), [Macro.t()] -> Macro.t())) ::
+          :skip | [Macro.t()]
+  defp redirect_status_mutations(args, rebuild) do
+    with 2 <- length(args),
+         [_ | _] = options <- status_option_swaps(Enum.at(args, @options_index)) do
+      Enum.map(options, &rebuild.(:redirect, List.replace_at(args, @options_index, &1)))
     else
       _ -> :skip
     end

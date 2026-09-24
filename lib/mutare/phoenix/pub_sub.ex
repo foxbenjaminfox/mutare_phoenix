@@ -23,10 +23,10 @@ defmodule Mutare.Phoenix.PubSub do
   covered by `:channel_message`.
 
   Only the defined arities match, so a name-matched call of any other arity (reachable only by an
-  explicit qualifier) is left alone, keeping every metamutant compiling. A piped call is left
-  alone too: none of these returns its first argument, so there is no faithful pass-through
-  to substitute, and piping a pubsub name into them is never idiomatic. Matches direct
-  (`Phoenix.PubSub.subscribe(...)`), aliased, and bare-imported calls.
+  explicit qualifier) is left alone, keeping every metamutant compiling. A call written as a
+  pipe stage (`pubsub |> Phoenix.PubSub.subscribe(topic)`) gets the same mutant, reported over
+  the whole pipe. Matches direct (`Phoenix.PubSub.subscribe(...)`), aliased, and bare-imported
+  calls.
   """
   @behaviour Mutare.Mutator
 
@@ -58,10 +58,7 @@ defmodule Mutare.Phoenix.PubSub do
   @spec variants() :: [String.t()]
   def variants, do: ~w(subscribe unsubscribe broadcast)
 
-  # No `mutate/1`: the piped form is deliberately skipped, which needs the pipe context only
-  # `mutate/2` carries.
   @impl Mutare.Mutator
-  @spec mutate(Macro.t(), Mutare.Mutator.context()) :: :skip | [Mutation.t()]
-  def mutate(node, %{pipe_mode: pipe_mode}),
-    do: Removal.removed(node, Phoenix.PubSub, @table, pipe_mode)
+  @spec mutate(Macro.t()) :: :skip | [Mutation.t()]
+  def mutate(node), do: Removal.removed(node, Phoenix.PubSub, @table)
 end

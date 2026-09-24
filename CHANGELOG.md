@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking: requires Mutare 0.4.0 and mutare_plug 0.2** (`{:mutare, "~> 0.4.0"}`,
+  `{:mutare_plug, "~> 0.2"}`). Mutare 0.4.0 offers a call written as a pipe stage to a
+  mutator as the direct call it is sugar for, with the piped value as its first argument;
+  the families here read their argument positions that way now and no longer need Mutare's
+  removed pipe-mode API.
+- A mutant that leaves the piped value alone is still reported at the stage
+  (`conn |> json(%{id: 1})` → `json(%{})` at the `json` stage, as before); one that
+  replaces the whole call is reported over the whole pipe.
+
+### Added
+
+- The removal families mutate a call written as a pipe stage. `socket |> push("ack", %{})`
+  and `pubsub |> Phoenix.PubSub.subscribe(topic)` now collapse to `:ok` over the whole pipe,
+  upstream stages included; through 0.2.0 the piped spelling was left alone because the
+  `:ok` could not be spelled as a stage.
+
 ## [0.2.0] - 2026-09-14
 
 ### Added

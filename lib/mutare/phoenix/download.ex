@@ -28,40 +28,35 @@ defmodule Mutare.Phoenix.Download do
   # The two disposition types Phoenix accepts, each the other's flip.
   @flips %{attachment: :inline, inline: :attachment}
 
-  # The options are the third effective argument of `send_download/3`.
+  # The options are the third argument of `send_download/3`.
   @options_index 2
 
   @impl Mutare.Mutator
   @spec name() :: :download_disposition
   def name, do: :download_disposition
 
-  # No `mutate/1`: the options list's visible index depends on pipe context.
   @impl Mutare.Mutator
-  @spec mutate(Macro.t(), Mutare.Mutator.context()) :: :skip | [Macro.t()]
-  def mutate(node, %{pipe_mode: pipe_mode}) do
+  @spec mutate(Macro.t()) :: :skip | [Macro.t()]
+  def mutate(node) do
     case Calls.resolved_call(node) do
       {[:Phoenix, :Controller], :send_download, args, rebuild} ->
-        disposition_mutations(args, pipe_mode, rebuild)
+        disposition_mutations(args, rebuild)
 
       _other ->
         :skip
     end
   end
 
-  # The `:disposition` option lives in the third effective argument of `send_download/3`:
-  # `send_download(conn, kind, disposition: :inline)`, or visible index 1 in a pipe stage.
-  # Anything that is not exactly `send_download/3`, or whose options are not a literal
+  # The `:disposition` option lives in the third argument of `send_download/3`:
+  # `send_download(conn, kind, disposition: :inline)` — a pipe stage arrives as that same
+  # call. Anything that is not exactly `send_download/3`, or whose options are not a literal
   # keyword list, is skipped.
-  @spec disposition_mutations(
-          [Macro.t()],
-          Mutare.Mutator.pipe_mode(),
-          (atom(), [Macro.t()] -> Macro.t())
-        ) :: :skip | [Macro.t()]
-  defp disposition_mutations(args, pipe_mode, rebuild) do
-    with 3 <- Mutare.Mutator.effective_arity(args, pipe_mode),
-         vis when is_integer(vis) <- Mutare.Mutator.visible_index(@options_index, pipe_mode),
-         [_ | _] = options <- disposition_flips(Enum.at(args, vis)) do
-      Enum.map(options, &rebuild.(:send_download, List.replace_at(args, vis, &1)))
+  @spec disposition_mutations([Macro.t()], (atom(), [Macro.t()] -> Macro.t())) ::
+          :skip | [Macro.t()]
+  defp disposition_mutations(args, rebuild) do
+    with 3 <- length(args),
+         [_ | _] = options <- disposition_flips(Enum.at(args, @options_index)) do
+      Enum.map(options, &rebuild.(:send_download, List.replace_at(args, @options_index, &1)))
     else
       _other -> :skip
     end

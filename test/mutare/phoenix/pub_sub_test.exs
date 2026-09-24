@@ -3,8 +3,8 @@ defmodule Mutare.Phoenix.PubSubTest do
   `:pubsub` — three variant-labelled removals on the `Phoenix.PubSub` calls, each collapsing
   the call to the `:ok` its happy path returns: `subscribe`, `unsubscribe`, and `broadcast`
   (the whole `broadcast`/`broadcast!`/`broadcast_from`/`local_broadcast`/`direct_broadcast`
-  surface). Matches direct, aliased, and bare-imported forms; the never-idiomatic piped form
-  is left alone.
+  surface). Matches direct, aliased, and bare-imported forms; the piped form gets the
+  same mutant, over the whole pipe.
   """
   use ExUnit.Case, async: true
 
@@ -105,8 +105,9 @@ defmodule Mutare.Phoenix.PubSubTest do
   end
 
   describe "pipe awareness" do
-    test "a piped subscribe is left alone (no faithful pass-through, never idiomatic)" do
-      assert pubsub_diffs(live("  def go(p), do: p |> Phoenix.PubSub.subscribe(\"t\")")) == []
+    test "a piped subscribe collapses the whole pipe to :ok" do
+      assert pubsub_diffs(live("  def go(p), do: p |> Phoenix.PubSub.subscribe(\"t\")")) ==
+               [{"p |> Phoenix.PubSub.subscribe(\"t\")", ":ok"}]
     end
   end
 
@@ -146,8 +147,8 @@ defmodule Mutare.Phoenix.PubSubTest do
       assert node_mutations("Phoenix.PubSub.subscribe(P, \"t\")", PubSub) == [":ok"]
     end
 
-    test "a piped stage node yields nothing (piped is left alone)" do
-      assert node_mutations("Phoenix.PubSub.subscribe(\"t\")", PubSub, :piped) == []
+    test "a bare-arity node is not a listed call (no pipe context can complete it)" do
+      assert node_mutations("Phoenix.PubSub.subscribe(\"t\")", PubSub) == []
     end
   end
 
@@ -173,6 +174,9 @@ defmodule Mutare.Phoenix.PubSubTest do
         :ok = PubSub.unsubscribe(Demo.PubSub, id)
         Map.put(m, :result, PubSub.local_broadcast(Demo.PubSub, id, :m))
       end
+
+      # A pipe stage: the `:ok` replaces the whole pipe, upstream included.
+      def piped(pubsub, id), do: pubsub |> PubSub.subscribe("room:" <> id)
     end
     """
 

@@ -4,7 +4,7 @@ defmodule Mutare.Phoenix.ChannelMessageTest do
   calls, each collapsing the call to the `:ok` its happy path returns: `broadcast` (the four
   `broadcast`/`broadcast!`/`broadcast_from`/`broadcast_from!` forms), `push`, and `reply`.
   Matches direct, aliased, and bare-imported (`use Phoenix.Channel`) forms; the
-  never-idiomatic piped form is left alone.
+  piped form gets the same mutant, over the whole pipe.
   """
   use ExUnit.Case, async: true
 
@@ -88,8 +88,16 @@ defmodule Mutare.Phoenix.ChannelMessageTest do
   end
 
   describe "pipe awareness" do
-    test "a piped broadcast is left alone (no faithful pass-through, never idiomatic)" do
-      assert message_diffs(channel("  def go(s), do: s |> broadcast(\"a\", %{})")) == []
+    test "a piped broadcast collapses the whole pipe to :ok" do
+      assert message_diffs(channel("  def go(s), do: s |> broadcast(\"a\", %{})")) ==
+               [{"s |> broadcast(\"a\", %{})", ":ok"}]
+    end
+
+    test "a piped push mid-chain takes its upstream along" do
+      body = "  def go(s), do: s |> assign(:a, 1) |> push(\"a\", %{}) |> then(&{:noreply, &1})"
+
+      assert message_diffs(channel(body)) ==
+               [{"s |> assign(:a, 1) |> push(\"a\", %{})", ":ok"}]
     end
   end
 
@@ -130,9 +138,8 @@ defmodule Mutare.Phoenix.ChannelMessageTest do
                [":ok"]
     end
 
-    test "a piped stage node yields nothing (piped is left alone)" do
-      assert node_mutations("Phoenix.Channel.broadcast(\"a\", %{})", ChannelMessage, :piped) ==
-               []
+    test "a bare-arity node is not a listed call (no pipe context can complete it)" do
+      assert node_mutations("Phoenix.Channel.broadcast(\"a\", %{})", ChannelMessage) == []
     end
   end
 
@@ -159,6 +166,7 @@ defmodule Mutare.Phoenix.ChannelMessageTest do
       def awkward(socket, m) do
         broadcast(socket, "a", %{}) |> then(&Map.put(m, :result, &1))
         Map.put(m, :result, push(socket, "b", %{}))
+        socket |> broadcast("c", %{}) |> then(&Map.put(m, :piped, &1))
       end
     end
     """

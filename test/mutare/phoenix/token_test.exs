@@ -190,14 +190,14 @@ defmodule Mutare.Phoenix.TokenTest do
   end
 
   describe "pipe awareness" do
-    test "a piped sign finds the data at visible index 1" do
+    test "a piped sign finds the data at index 2 of the direct call" do
       assert token_diffs(mod("  def t(e, id), do: e |> Phoenix.Token.sign(\"s\", id)")) == [
                {"Phoenix.Token.sign(\"s\", id)", "Phoenix.Token.encrypt(\"s\", id)"},
                {"Phoenix.Token.sign(\"s\", id)", "Phoenix.Token.sign(\"s\", nil)"}
              ]
     end
 
-    test "a piped verify/4 finds the options at visible index 2" do
+    test "a piped verify/4 finds the options at index 3 of the direct call" do
       body = "  def t(e, tok), do: e |> Phoenix.Token.verify(\"s\", tok, max_age: 60)"
 
       assert {"Phoenix.Token.verify(\"s\", tok, max_age: 60)",
@@ -232,11 +232,11 @@ defmodule Mutare.Phoenix.TokenTest do
                ["Phoenix.Token.encrypt(e, \"s\", id)", "Phoenix.Token.sign(e, \"s\", nil)"]
     end
 
-    test "a piped verify stage node yields the swap and the expiry" do
-      assert node_mutations("Phoenix.Token.verify(\"s\", t, max_age: 1)", Token, :piped) ==
+    test "a verify/4 node yields the swap and the expiry (a pipe stage arrives as this call)" do
+      assert node_mutations("Phoenix.Token.verify(e, \"s\", t, max_age: 1)", Token) ==
                [
-                 "Phoenix.Token.decrypt(\"s\", t, max_age: 1)",
-                 "Phoenix.Token.verify(\"s\", t, max_age: :infinity)"
+                 "Phoenix.Token.decrypt(e, \"s\", t, max_age: 1)",
+                 "Phoenix.Token.verify(e, \"s\", t, max_age: :infinity)"
                ]
     end
   end

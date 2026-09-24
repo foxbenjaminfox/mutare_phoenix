@@ -40,10 +40,9 @@ defmodule Mutare.Phoenix.Token do
 
   Only the defined arities match — 3 and 4 for all four calls — so a name-matched call of any
   other arity (reachable only by an explicit qualifier) is left alone, keeping every
-  metamutant compiling. The context argument (an endpoint, conn, or socket) is the first
-  effective argument, so a piped call (`endpoint |> Phoenix.Token.sign(salt, data)`) is
-  handled through pipe context. Matches direct (`Phoenix.Token.sign(...)`), aliased, and
-  bare-imported calls.
+  metamutant compiling. A piped call (`endpoint |> Phoenix.Token.sign(salt, data)`) is the
+  same call with the context argument (an endpoint, conn, or socket) first. Matches direct
+  (`Phoenix.Token.sign(...)`), aliased, and bare-imported calls.
   """
   @behaviour Mutare.Mutator
 
@@ -61,8 +60,8 @@ defmodule Mutare.Phoenix.Token do
   # data_or_token, opts \\ [])` — so the swap is a rename with the arguments kept.
   @schemes %{sign: :encrypt, encrypt: :sign, verify: :decrypt, decrypt: :verify}
 
-  # The minting calls carry the data at effective index 2; the reading calls carry the
-  # options (with `max_age:`) at effective index 3, present only at arity 4.
+  # The minting calls carry the data at index 2; the reading calls carry the options (with
+  # `max_age:`) at index 3, present only at arity 4.
   @minters [:sign, :encrypt]
   @readers [:verify, :decrypt]
   @arities [3, 4]
@@ -88,16 +87,13 @@ defmodule Mutare.Phoenix.Token do
     for reader <- @readers, do: {Phoenix.Token, reader, 4, [{:keyword, :max_age}], :timeout}
   end
 
-  # No `mutate/1`: the data and options positions are non-first effective arguments whose
-  # visible index depends on pipe context, and the arity guard needs it too.
   @impl Mutare.Mutator
-  @spec mutate(Macro.t(), Mutator.context()) :: :skip | [Mutation.t()]
-  def mutate(node, %{pipe_mode: pipe_mode}) do
+  @spec mutate(Macro.t()) :: :skip | [Mutation.t()]
+  def mutate(node) do
     with {:ok, fun, args, rebuild} <-
            Calls.resolved_call_to(node, Phoenix.Token, Map.keys(@schemes)),
-         true <- Mutator.effective_arity(args, pipe_mode) in @arities do
-      scheme(fun, args, rebuild) ++
-        payload(fun, args, pipe_mode, rebuild) ++ expiry(fun, args, pipe_mode, rebuild)
+         true <- length(args) in @arities do
+      scheme(fun, args, rebuild) ++ payload(fun, args, rebuild) ++ expiry(fun, args, rebuild)
     else
       _other -> :skip
     end
@@ -111,39 +107,38 @@ defmodule Mutare.Phoenix.Token do
   # Blank a minting call's data to `nil` — unless it already is, where the mutant would
   # change nothing. The data is replaced wholesale by a fresh literal: it is usually a
   # variable or a call, not a wrapped literal whose metadata is worth keeping.
-  @spec payload(atom(), [Macro.t()], Mutator.pipe_mode(), rebuild()) :: [Mutation.t()]
-  defp payload(fun, args, pipe_mode, rebuild) when fun in @minters do
-    with vis when is_integer(vis) <- Mutator.visible_index(@data_index, pipe_mode),
-         data = Enum.at(args, vis),
-         false <- AST.literal_value(data) == {:ok, nil} do
-      blanked = rebuild.(fun, List.replace_at(args, vis, AST.literal(nil)))
-      [Mutation.tagged(blanked, "payload")]
+  @spec payload(atom(), [Macro.t()], rebuild()) :: [Mutation.t()]
+  defp payload(fun, args, rebuild) when fun in @minters do
+    data = Enum.at(args, @data_index)
+
+    if AST.literal_value(data) == {:ok, nil} do
+      []
     else
-      _other -> []
+      blanked = rebuild.(fun, List.replace_at(args, @data_index, AST.literal(nil)))
+      [Mutation.tagged(blanked, "payload")]
     end
   end
 
-  defp payload(_fun, _args, _pipe_mode, _rebuild), do: []
+  defp payload(_fun, _args, _rebuild), do: []
 
   # For every literal integer `max_age:` in a reader's options, one rebuilt call with just
   # that value swapped to `:infinity` — keeping the value node's position metadata (see
   # `Options.swap_literal/2`) so the call renders as a minimal inline diff.
-  @spec expiry(atom(), [Macro.t()], Mutator.pipe_mode(), rebuild()) :: [Mutation.t()]
-  defp expiry(fun, args, pipe_mode, rebuild) when fun in @readers do
-    with 4 <- Mutator.effective_arity(args, pipe_mode),
-         vis when is_integer(vis) <- Mutator.visible_index(@options_index, pipe_mode),
-         {pairs, rewrap} <- Options.keyword_list(Enum.at(args, vis)) do
+  @spec expiry(atom(), [Macro.t()], rebuild()) :: [Mutation.t()]
+  defp expiry(fun, args, rebuild) when fun in @readers do
+    with 4 <- length(args),
+         {pairs, rewrap} <- Options.keyword_list(Enum.at(args, @options_index)) do
       for {{key, value}, i} <- Enum.with_index(pairs),
           Options.key?(key, :max_age),
           match?({:ok, seconds} when is_integer(seconds), AST.literal_value(value)) do
         pair = {key, Options.swap_literal(value, :infinity)}
         opts = rewrap.(List.replace_at(pairs, i, pair))
-        Mutation.tagged(rebuild.(fun, List.replace_at(args, vis, opts)), "expiry")
+        Mutation.tagged(rebuild.(fun, List.replace_at(args, @options_index, opts)), "expiry")
       end
     else
       _other -> []
     end
   end
 
-  defp expiry(_fun, _args, _pipe_mode, _rebuild), do: []
+  defp expiry(_fun, _args, _rebuild), do: []
 end

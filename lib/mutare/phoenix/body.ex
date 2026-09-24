@@ -31,8 +31,9 @@ defmodule Mutare.Phoenix.Body do
   alias Mutare.Calls
 
   # The `Phoenix.Controller` renderers that take a body, each with its blank. In all three
-  # the body sits at effective argument index 1 — the second positional argument — and the
-  # arity is fixed at 2, so a wrong-arity call (not the real function) contributes nothing.
+  # the body is the second argument (a pipe stage arrives as the direct call, its piped conn
+  # first) and the arity is fixed at 2, so a wrong-arity call (not the real function)
+  # contributes nothing.
   @blanks %{json: %{}, text: "", html: ""}
 
   @body_index 1
@@ -41,34 +42,27 @@ defmodule Mutare.Phoenix.Body do
   @spec name() :: :controller_body
   def name, do: :controller_body
 
-  # No `mutate/1`: the body's visible position depends on pipe context, so this family
-  # produces only through the context-aware `mutate/2`.
   @impl Mutare.Mutator
-  @spec mutate(Macro.t(), Mutare.Mutator.context()) :: :skip | [Macro.t()]
-  def mutate(node, %{pipe_mode: pipe_mode}) do
+  @spec mutate(Macro.t()) :: :skip | [Macro.t()]
+  def mutate(node) do
     case Calls.resolved_call(node) do
       {[:Phoenix, :Controller], call, args, rebuild} when is_map_key(@blanks, call) ->
-        body_mutations(call, args, pipe_mode, rebuild)
+        body_mutations(call, args, rebuild)
 
       _other ->
         :skip
     end
   end
 
-  @spec body_mutations(
-          atom(),
-          [Macro.t()],
-          Mutare.Mutator.pipe_mode(),
-          (atom(), [Macro.t()] -> Macro.t())
-        ) :: :skip | [Macro.t()]
-  defp body_mutations(call, args, pipe_mode, rebuild) do
+  @spec body_mutations(atom(), [Macro.t()], (atom(), [Macro.t()] -> Macro.t())) ::
+          :skip | [Macro.t()]
+  defp body_mutations(call, args, rebuild) do
     blank = Map.fetch!(@blanks, call)
 
-    with 2 <- Mutare.Mutator.effective_arity(args, pipe_mode),
-         vis when is_integer(vis) <- Mutare.Mutator.visible_index(@body_index, pipe_mode),
-         body = Enum.at(args, vis),
+    with 2 <- length(args),
+         body = Enum.at(args, @body_index),
          false <- blank?(body, blank) do
-      [rebuild.(call, List.replace_at(args, vis, blank_body(body, blank)))]
+      [rebuild.(call, List.replace_at(args, @body_index, blank_body(body, blank)))]
     else
       _other -> :skip
     end

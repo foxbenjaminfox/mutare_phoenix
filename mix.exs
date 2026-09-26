@@ -1,7 +1,7 @@
 defmodule Mutare.Phoenix.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.3.0"
   @source_url "https://github.com/foxbenjaminfox/mutare_phoenix"
 
   def project do
@@ -52,7 +52,7 @@ defmodule Mutare.Phoenix.MixProject do
       # `Mutare.Mutator` / `Mutare.CallRouting` and rides only its public extension
       # points (`Mutare.Calls`, `Mutare.AST`). Tests use `Mutare.Test` and
       # `Mutare.AST` for AST parse/render, so no direct `:sourceror` dep is needed.
-      {:mutare, "~> 0.4.0"},
+      {:mutare, "~> 0.4.1"},
       # The companion base package — this one **builds on** it: it depends on it and
       # composes its preset (`Mutare.Plug.all/0`) with the controller-level families on
       # top (mirroring how `phoenix` depends on `plug`). A consuming project lists both

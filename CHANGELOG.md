@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-26
+
 ### Changed
 
-- **Breaking: requires Mutare 0.4.0 and mutare_plug 0.2** (`{:mutare, "~> 0.4.0"}`,
+- **Breaking: requires Mutare 0.4.1 and mutare_plug 0.2** (`{:mutare, "~> 0.4.1"}`,
   `{:mutare_plug, "~> 0.2"}`). Mutare 0.4.0 offers a call written as a pipe stage to a
   mutator as the direct call it is sugar for, with the piped value as its first argument;
   the families here read their argument positions that way now and no longer need Mutare's
@@ -77,6 +79,7 @@ families (`:plug_halt`, `:http_status`, `:plug_session`, `:resp_header`,
 - `Mutare.Phoenix.all/0` for splicing the Phoenix families into a `:mutators`
   list, composing with `Mutare.Plug.all/0`.
 
-[Unreleased]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/foxbenjaminfox/mutare_phoenix/releases/tag/v0.1.0

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-03
+
+### Changed
+
+- Requires Mutare 0.5 (`{:mutare, "~> 0.5.0"}`) and `mutare_plug` 0.2.1.
+
 ## [0.3.0] - 2026-09-26
 
 ### Changed
@@ -79,7 +85,8 @@ families (`:plug_halt`, `:http_status`, `:plug_session`, `:resp_header`,
 - `Mutare.Phoenix.all/0` for splicing the Phoenix families into a `:mutators`
   list, composing with `Mutare.Plug.all/0`.
 
-[Unreleased]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/foxbenjaminfox/mutare_phoenix/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/foxbenjaminfox/mutare_phoenix/releases/tag/v0.1.0

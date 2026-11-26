@@ -27,6 +27,14 @@ mix compile                        # MUST compile the root first — the demo's 
 mix mutare examples/demo           # appends the compiled packages' ebins to its code path
 ```
 
+Run the real Phoenix and LiveView integration tests from their own Mix project:
+
+```sh
+cd integration/phoenix
+MIX_ENV=test mix deps.get --check-locked
+mix test
+```
+
 `mix check` is the canonical pre-commit gate (defined in `mix.exs` aliases): `format --check-formatted`, then `credo`, then `dialyzer`. It does **not** run the test suite — run `mix test` separately. The first `dialyzer` invocation builds PLTs (a few minutes) into `priv/plts/` (git-ignored); subsequent runs are fast.
 
 ## Dependencies & layout

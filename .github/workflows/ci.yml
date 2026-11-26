@@ -57,9 +57,8 @@ jobs:
   # Test matrix. The `~> 1.18` requirement admits every stable Elixir 1.x
   # release from 1.18 onward; each current release line gets a blocking entry
   # across OTP 25-28 compatible pairings. The development tip is informational
-  # only (continue-on-error). The Plug/Phoenix surface is exercised through
-  # test stubs, so no framework-version axis is needed here — the mutators only
-  # ever match calls by name, never call into Phoenix.
+  # only (continue-on-error). These tests use stubs. The phoenix-integration
+  # job exercises the published framework packages.
   test:
     name: test (Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }})
     runs-on: ubuntu-24.04
@@ -99,3 +98,24 @@ jobs:
       - run: mix deps.get --check-locked
       - run: mix compile --warnings-as-errors
       - run: mix test
+
+  phoenix-integration:
+    name: test (real Phoenix and LiveView)
+    runs-on: ubuntu-24.04
+    env:
+      MIX_ENV: test
+    defaults:
+      run:
+        working-directory: integration/phoenix
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Set up Elixir / OTP
+        uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+        with:
+          elixir-version: "1.19"
+          otp-version: "27"
+
+      - run: mix deps.get --check-locked
+      - run: mix format --check-formatted
+      - run: mix test --warnings-as-errors

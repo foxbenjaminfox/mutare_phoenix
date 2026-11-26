@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     or use `# mutare:ignore[http_status]` on the `put_status/2` call that sets the
     redirect status.
 
+### Fixed
+
+- Download disposition and token expiry mutations use the first occurrence of their
+  keyword option. Later duplicates are shadowed at runtime.
+
 ## [0.3.1] - 2026-10-03
 
 ### Changed

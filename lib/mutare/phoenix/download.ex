@@ -9,10 +9,9 @@ defmodule Mutare.Phoenix.Download do
       conn |> send_download({:binary, csv}, filename: "r.csv", disposition: :inline)
       #                                                                     ↳ :attachment
 
-  Only an explicit literal atom is flipped: a `send_download` that relies on Phoenix's
-  default (`:attachment`), or passes a variable, is left alone — as is `send_download/2`,
-  which has no options at all. Matches the call written directly
-  (`Phoenix.Controller.send_download(conn, ...)`), aliased, or bare-imported
+  The first `disposition:` entry is eligible when it contains an explicit atom literal.
+  Phoenix uses its default (`:attachment`) when the option is omitted. Matches qualified
+  calls (`Phoenix.Controller.send_download(conn, ...)`), aliased calls, and bare imports
   (`send_download(conn, ...)`, the form `use MyAppWeb, :controller` produces).
 
   The swap substitutes exactly the disposition atom, so `Mutare.Transform.Overlap` prunes
@@ -22,14 +21,12 @@ defmodule Mutare.Phoenix.Download do
   """
   @behaviour Mutare.Mutator
 
+  alias Mutare.AST
   alias Mutare.Calls
   alias Mutare.Phoenix.Options
 
   # The two disposition types Phoenix accepts, each the other's flip.
   @flips %{attachment: :inline, inline: :attachment}
-
-  # The options are the third argument of `send_download/3`.
-  @options_index 2
 
   @impl Mutare.Mutator
   @spec name() :: :download_disposition
@@ -38,46 +35,14 @@ defmodule Mutare.Phoenix.Download do
   @impl Mutare.Mutator
   @spec mutate(Macro.t()) :: :skip | [Macro.t()]
   def mutate(node) do
-    case Calls.resolved_call(node) do
-      {[:Phoenix, :Controller], :send_download, args, rebuild} ->
-        disposition_mutations(args, rebuild)
-
-      _other ->
-        :skip
-    end
-  end
-
-  # The `:disposition` option lives in the third argument of `send_download/3`:
-  # `send_download(conn, kind, disposition: :inline)` — a pipe stage arrives as that same
-  # call. Anything that is not exactly `send_download/3`, or whose options are not a literal
-  # keyword list, is skipped.
-  @spec disposition_mutations([Macro.t()], (atom(), [Macro.t()] -> Macro.t())) ::
-          :skip | [Macro.t()]
-  defp disposition_mutations(args, rebuild) do
-    with 3 <- length(args),
-         [_ | _] = options <- disposition_flips(Enum.at(args, @options_index)) do
-      Enum.map(options, &rebuild.(:send_download, List.replace_at(args, @options_index, &1)))
+    with {:ok, :send_download, [conn, kind, opts], rebuild} <-
+           Calls.resolved_call_to(node, Phoenix.Controller, :send_download),
+         {:ok, value, replace} <- Options.fetch_first(opts, :disposition),
+         {:ok, current} <- AST.literal_value(value),
+         {:ok, flipped} <- Map.fetch(@flips, current) do
+      [rebuild.(:send_download, [conn, kind, replace.(flipped)])]
     else
       _other -> :skip
-    end
-  end
-
-  # For every literal `disposition: atom` pair whose atom has a flip, one rebuilt options
-  # list with just that value changed — keeping the value node's position metadata (see
-  # `Options.swap_literal/2`) so the call renders as a minimal inline diff.
-  @spec disposition_flips(Macro.t()) :: [Macro.t()]
-  defp disposition_flips(arg) do
-    case Options.keyword_list(arg) do
-      nil ->
-        []
-
-      {pairs, rewrap} ->
-        for {{key, value}, i} <- Enum.with_index(pairs),
-            Options.key?(key, :disposition),
-            current <- Options.atom_literal(value),
-            flipped <- List.wrap(Map.get(@flips, current)) do
-          rewrap.(List.replace_at(pairs, i, {key, Options.swap_literal(value, flipped)}))
-        end
     end
   end
 end

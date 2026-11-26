@@ -98,6 +98,51 @@ defmodule Mutare.Phoenix.DownloadTest do
                 "Phoenix.Controller.send_download(conn, {:file, p}, disposition: :attachment)"}
              ]
     end
+
+    test "only the first disposition can change across option order and written shapes" do
+      for {first, replacement} <- [
+            {":inline", ":attachment"},
+            {":attachment", ":inline"},
+            {":unsupported", nil},
+            {"mode", nil}
+          ],
+          later <- [":inline", ":attachment"],
+          {prefix, middle} <- [{~s(filename: "r", ), ""}, {"", ~s(filename: "r", )}],
+          bracketed? <- [false, true] do
+        options = fn value ->
+          "#{prefix}disposition: #{value}, #{middle}disposition: #{later}"
+        end
+
+        call = fn opts -> "send_download(c, path, #{opts})" end
+        written_options = if bracketed?, do: "[#{options.(first)}]", else: options.(first)
+        source = controller("  def export(c, path, mode), do: #{call.(written_options)}")
+
+        expected =
+          if replacement,
+            do: [{call.(options.(first)), call.(options.(replacement))}],
+            else: []
+
+        assert download_diffs(source) == expected
+      end
+    end
+
+    # An interpolated key is the computed key keyword syntax allows. (Options written as
+    # explicit tuples, `[{key, :inline}]`, are never matched at all, so they cannot test this.)
+    test "a computed key before disposition can shadow it; one after cannot" do
+      for bracketed? <- [false, true] do
+        source = fn opts ->
+          written = if bracketed?, do: "[#{opts}]", else: opts
+          controller("  def export(c, path, key), do: send_download(c, path, #{written})")
+        end
+
+        shadowing = ~S|"#{key}": :inline, disposition: :attachment|
+        assert download_diffs(source.(shadowing)) == []
+
+        # The report renders a computed keyword key in tuple form, so only count the flip.
+        trailing = ~S|disposition: :attachment, "#{key}": :inline|
+        assert [_flip] = download_diffs(source.(trailing))
+      end
+    end
   end
 
   describe "scope" do

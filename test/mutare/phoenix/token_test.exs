@@ -134,6 +134,23 @@ defmodule Mutare.Phoenix.TokenTest do
       assert Enum.map(result.mutants, & &1.variant) == List.duplicate(["scheme"], 4)
     end
 
+    test "the expiry variant uses the first max_age before checking whether it is an integer" do
+      for first <- ["60", "age", ":infinity"],
+          bracketed? <- [false, true] do
+        tail = ", key_length: 32, max_age: 120"
+        opts = "max_age: #{first}#{tail}"
+        written_opts = if bracketed?, do: "[#{opts}]", else: opts
+        call = fn options -> ~s|Phoenix.Token.verify(e, "s", tok, #{options})| end
+        source = mod("  def t(e, tok, age), do: #{call.(written_opts)}")
+        result = Mutare.transform_string(source, mutators: [Token])
+
+        expiry = for site <- result.mutants, site.variant == ["expiry"], do: site.mutated_code
+        expected = if first == "60", do: [call.("max_age: :infinity#{tail}")], else: []
+
+        assert expiry == expected
+      end
+    end
+
     test "a minting call's options are not an expiry" do
       body = "  def t(e, id), do: Phoenix.Token.sign(e, \"s\", id, max_age: 60)"
 

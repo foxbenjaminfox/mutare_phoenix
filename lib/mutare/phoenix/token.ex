@@ -25,9 +25,9 @@ defmodule Mutare.Phoenix.Token do
 
       Phoenix.Token.verify(endpoint, salt, token, max_age: 86_400)  ->  max_age: :infinity
 
-  A survivor means no test checks that an expired token is rejected. Only an explicit
-  integer literal is mutated; a call relying on Phoenix's default (one day), or passing a
-  variable or `:infinity`, is left alone. The position is marked with the shared `:timeout` label
+  A survivor means no test checks that an expired token is rejected. The first
+  `max_age:` entry is eligible when it contains an explicit integer literal.
+  The position is marked with the shared `:timeout` label
   (`c:Mutare.Mutator.argument_marks/1`), so Mutare's built-in `:integer` family skips the
   duration literal. The `expiry` mutation tests whether expiry is enforced; an off-by-one
   change such as `86_400 → 86_401` would be difficult to detect reliably in a test.
@@ -60,13 +60,11 @@ defmodule Mutare.Phoenix.Token do
   # data_or_token, opts \\ [])` — so the swap is a rename with the arguments kept.
   @schemes %{sign: :encrypt, encrypt: :sign, verify: :decrypt, decrypt: :verify}
 
-  # The minting calls carry the data at index 2; the reading calls carry the options (with
-  # `max_age:`) at index 3, present only at arity 4.
+  # The minting calls carry the data at index 2. The reading calls take options at arity 4.
   @minters [:sign, :encrypt]
   @readers [:verify, :decrypt]
   @arities [3, 4]
   @data_index 2
-  @options_index 3
 
   @impl Mutare.Mutator
   @spec name() :: :token
@@ -121,20 +119,12 @@ defmodule Mutare.Phoenix.Token do
 
   defp payload(_fun, _args, _rebuild), do: []
 
-  # For every literal integer `max_age:` in a reader's options, one rebuilt call with just
-  # that value swapped to `:infinity` — keeping the value node's position metadata (see
-  # `Options.swap_literal/2`) so the call renders as a minimal inline diff.
   @spec expiry(atom(), [Macro.t()], rebuild()) :: [Mutation.t()]
-  defp expiry(fun, args, rebuild) when fun in @readers do
-    with 4 <- length(args),
-         {pairs, rewrap} <- Options.keyword_list(Enum.at(args, @options_index)) do
-      for {{key, value}, i} <- Enum.with_index(pairs),
-          Options.key?(key, :max_age),
-          match?({:ok, seconds} when is_integer(seconds), AST.literal_value(value)) do
-        pair = {key, Options.swap_literal(value, :infinity)}
-        opts = rewrap.(List.replace_at(pairs, i, pair))
-        Mutation.tagged(rebuild.(fun, List.replace_at(args, @options_index, opts)), "expiry")
-      end
+  defp expiry(fun, [context, salt, token, opts], rebuild) when fun in @readers do
+    with {:ok, value, replace} <- Options.fetch_first(opts, :max_age),
+         {:ok, seconds} when is_integer(seconds) <- AST.literal_value(value) do
+      mutated = rebuild.(fun, [context, salt, token, replace.(:infinity)])
+      [Mutation.tagged(mutated, "expiry")]
     else
       _other -> []
     end

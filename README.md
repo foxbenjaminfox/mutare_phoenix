@@ -42,7 +42,8 @@ Each call family matches its call written directly (`Phoenix.Controller.json(con
 aliased, or bare-imported (`json(conn, ...)`, the form `use MyAppWeb, :controller`
 produces; `broadcast(socket, ...)`, the form `use Phoenix.Channel` produces).
 `:download_disposition` requires an explicit atom literal, and the token `expiry` variant
-requires an explicit integer literal.
+requires an explicit integer literal. Both use the first occurrence of their option key,
+which is the one Phoenix reads.
 `render/3` is out of scope for `:controller_body` — its argument names a template, not a
 body.
 

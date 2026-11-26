@@ -1,60 +1,41 @@
 defmodule Mutare.Phoenix.Options do
-  # The shared keyword-options plumbing for the families that mutate a call's trailing
-  # options (`Download`'s `disposition:`, `Token`'s `max_age:`): read the `{key, value}`
-  # pairs out of an options argument in either written shape, and put a mutated pair list
-  # back in the same shape.
   @moduledoc false
 
   alias Mutare.AST
 
-  # Restores a mutated pair list to the argument's original written shape.
-  @type rewrap :: ([Macro.t()] -> Macro.t())
+  @typep replace :: (atom() -> Macro.t())
 
-  # A bare trailing keyword list such as `disposition: :inline` arrives as the
-  # pair list itself; an explicit bracketed list (`[disposition: :inline]`) arrives
-  # Sourceror-wrapped in a `:__block__`, and `rewrap` restores that wrapper. Anything that
-  # is not a non-empty list of `{key, value}` pairs — a variable, a map, `[]` — is `nil`.
+  # Follow Keyword.get/3's first-match rule and keep the rest of the list intact.
+  # An explicit bracketed list carries a Sourceror block wrapper that we restore.
   @doc false
-  @spec keyword_list(Macro.t()) :: {[{Macro.t(), Macro.t()}], rewrap()} | nil
-  def keyword_list({:__block__, meta, [inner]}) when is_list(inner) do
-    with pairs when pairs != nil <- keyword_pairs(inner),
-         do: {pairs, fn new -> {:__block__, meta, [new]} end}
+  @spec fetch_first(Macro.t(), atom()) :: {:ok, Macro.t(), replace()} | :error
+  def fetch_first({:__block__, meta, [pairs]}, name) when is_list(pairs) do
+    fetch_pair(pairs, name, fn new -> {:__block__, meta, [new]} end)
   end
 
-  def keyword_list(list) when is_list(list) do
-    with pairs when pairs != nil <- keyword_pairs(list), do: {pairs, & &1}
-  end
+  def fetch_first(pairs, name) when is_list(pairs), do: fetch_pair(pairs, name, & &1)
+  def fetch_first(_arg, _name), do: :error
 
-  def keyword_list(_arg), do: nil
-
-  defp keyword_pairs(list) when is_list(list) and list != [] do
-    if Enum.all?(list, &match?({_key, _value}, &1)), do: list, else: nil
-  end
-
-  defp keyword_pairs(_list), do: nil
-
-  # Whether a pair's key node names `atom`.
-  @doc false
-  @spec key?(Macro.t(), atom()) :: boolean()
-  def key?(key, atom), do: AST.key_atom(key) == atom
-
-  # The atom a value node literally names, as a zero-or-one list for comprehension use.
-  # `true`/`false`/`nil` never name an option kind, so they yield nothing.
-  @doc false
-  @spec atom_literal(Macro.t()) :: [atom()]
-  def atom_literal(node) do
-    case AST.literal_value(node) do
-      {:ok, atom} when is_atom(atom) and atom not in [true, false, nil] -> [atom]
-      _other -> []
+  defp fetch_pair(pairs, name, rewrap) do
+    with {before, [{key, value} | rest]} <-
+           Enum.split_while(pairs, &different_literal_key?(&1, name)),
+         {:ok, ^name} <- AST.literal_value(key),
+         true <- Enum.all?(rest, &match?({_key, _value}, &1)) do
+      replace = fn new -> rewrap.(before ++ [{key, swap_literal(value, new)} | rest]) end
+      {:ok, value, replace}
+    else
+      _other -> :error
     end
   end
 
-  # Swap the literal inside the original value node, keeping its Sourceror metadata — the
-  # clean-meta rule: change the value, keep the position, so a multi-argument call
-  # re-renders inline. A bare (unwrapped) node has no metadata to keep and gets a fresh
-  # literal.
-  @doc false
-  @spec swap_literal(Macro.t(), term()) :: Macro.t()
-  def swap_literal({:__block__, meta, [_old]}, value), do: {:__block__, meta, [value]}
-  def swap_literal(_bare, value), do: AST.literal(value)
+  # Stop at a computed key, which could shadow a later literal at runtime.
+  defp different_literal_key?({key, _value}, name) do
+    match?({:ok, atom} when is_atom(atom) and atom != name, AST.literal_value(key))
+  end
+
+  defp different_literal_key?(_entry, _name), do: false
+
+  # Keep Sourceror metadata so a multi-argument call still renders inline.
+  defp swap_literal({:__block__, meta, [_old]}, value), do: {:__block__, meta, [value]}
+  defp swap_literal(_bare, value), do: AST.literal(value)
 end

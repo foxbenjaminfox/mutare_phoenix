@@ -21,10 +21,10 @@ defmodule Demo.PageControllerTest do
 
   # login asserts only the redirect target, never the redirect status — so changing
   # :found to another valid redirect status is invisible. A missing redirect-status
-  # assertion: :redirect_status survives.
+  # assertion: :http_status survives.
   test "login redirects to the login page" do
     conn = PageController.login(%Plug.Conn{}, %{})
-    assert conn.resp_body == "/login"
+    assert {"location", "/login"} in conn.resp_headers
   end
 
   # ping asserts the body is *text*, never what it says — so blanking it to "" is

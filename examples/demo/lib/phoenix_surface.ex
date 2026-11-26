@@ -27,9 +27,11 @@ defmodule Phoenix.Controller do
   @doc "Render a plain-text response body, keeping whatever status was set."
   def text(%Conn{} = conn, data), do: %{conn | resp_body: data}
 
-  @doc "Redirect to a local path, keeping the explicit redirect status when present."
+  @doc "Redirect to a local path, using the status set on the connection."
   def redirect(%Conn{} = conn, opts) when is_list(opts) do
-    %{conn | status: Keyword.get(opts, :status, :found), resp_body: Keyword.fetch!(opts, :to)}
+    conn
+    |> Conn.put_status(conn.status || :found)
+    |> Conn.put_resp_header("location", Keyword.fetch!(opts, :to))
   end
 
   @doc "Send a binary as a download, specifying the filename and whether to save or display it."

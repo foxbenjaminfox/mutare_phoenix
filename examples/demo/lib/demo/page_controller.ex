@@ -20,7 +20,9 @@ defmodule Demo.PageController do
 
   @doc "Redirect to the login page with an explicit temporary redirect."
   def login(conn, _params) do
-    Phoenix.Controller.redirect(conn, to: "/login", status: :found)
+    conn
+    |> Plug.Conn.put_status(:found)
+    |> Phoenix.Controller.redirect(to: "/login")
   end
 
   @doc "Respond to a liveness probe with a fixed text body."

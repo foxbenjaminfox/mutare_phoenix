@@ -11,7 +11,7 @@ mix mutare examples/demo
 
 | Example | Surface | What it demonstrates |
 | --- | --- | --- |
-| [`demo`](demo/) | Plug, controllers, channels, PubSub, tokens | Survivors in all seven Phoenix families plus Plug halt and status, alongside kills where the relevant behaviour is asserted. The walkthrough explains the missing assertions for replies, message delivery, token round-trips, payloads, and expiry. |
+| [`demo`](demo/) | Plug, controllers, channels, PubSub, tokens | Survivors in all six Phoenix families plus Plug halt and status, alongside kills where the relevant behaviour is asserted. The walkthrough explains the missing assertions for replies, message delivery, token round-trips, payloads, and expiry. |
 
 The project has **partial test coverage on purpose**, following the same pattern as the
 Mutare, Plug, LiveView, and Ecto examples: a passing suite with deliberate gaps, and a

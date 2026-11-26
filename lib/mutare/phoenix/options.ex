@@ -1,6 +1,6 @@
 defmodule Mutare.Phoenix.Options do
   # The shared keyword-options plumbing for the families that mutate a call's trailing
-  # options (`Redirect`'s `status:`, `Download`'s `disposition:`): read the `{key, value}`
+  # options (`Download`'s `disposition:`, `Token`'s `max_age:`): read the `{key, value}`
   # pairs out of an options argument in either written shape, and put a mutated pair list
   # back in the same shape.
   @moduledoc false
@@ -10,8 +10,8 @@ defmodule Mutare.Phoenix.Options do
   # Restores a mutated pair list to the argument's original written shape.
   @type rewrap :: ([Macro.t()] -> Macro.t())
 
-  # A bare trailing keyword list (`redirect(conn, to: "/", status: :found)`) arrives as the
-  # pair list itself; an explicit bracketed list (`redirect(conn, [to: "/"])`) arrives
+  # A bare trailing keyword list such as `disposition: :inline` arrives as the
+  # pair list itself; an explicit bracketed list (`[disposition: :inline]`) arrives
   # Sourceror-wrapped in a `:__block__`, and `rewrap` restores that wrapper. Anything that
   # is not a non-empty list of `{key, value}` pairs — a variable, a map, `[]` — is `nil`.
   @doc false

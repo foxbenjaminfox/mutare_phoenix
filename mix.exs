@@ -89,7 +89,6 @@ defmodule Mutare.Phoenix.MixProject do
       groups_for_modules: [
         "Mutator front / extension": [Mutare.Phoenix],
         "Mutator families": [
-          Mutare.Phoenix.Redirect,
           Mutare.Phoenix.Body,
           Mutare.Phoenix.Download,
           Mutare.Phoenix.ChannelReply,

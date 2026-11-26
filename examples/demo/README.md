@@ -42,7 +42,8 @@ mix test                    # 18 tests, 0 failures
 
 ## Plug and controller gaps
 
-The first two families come from `mutare_plug`; the rest belong to this package:
+`:plug_halt` and `:http_status` come from `mutare_plug`. The body and disposition
+families belong to this package.
 
 - **`:plug_halt` — the forgotten halt** (`Demo.Auth`). The auth plug sets `401` *and*
   halts. The test asserts the `401` (so the `:http_status` mutant `:unauthorized →
@@ -56,10 +57,10 @@ The first two families come from `mutare_plug`; the rest belong to this package:
   Two survivors, one per plausible sibling. (Contrast `index`, which **does** assert
   `:ok` — its `:created`/`:no_content` mutants are killed.)
 
-- **`:redirect_status` — the unasserted redirect status** (`Demo.PageController.login`).
-  `login` redirects to `"/login"` with an explicit `:found`, but its test checks only the
-  target. So changing the status to another valid redirect status (`:moved_permanently`,
-  `:see_other`) is invisible. Two survivors, one per plausible sibling.
+- **`:http_status` — the unasserted redirect status** (`Demo.PageController.login`).
+  `login` sets `:found` on the connection before redirecting to `"/login"`. The test
+  checks only the location header, so both status swaps (`:moved_permanently` and
+  `:see_other`) survive.
 
 - **`:controller_body` — the unread body** (`Demo.PageController.ping`). `ping` responds with
   `"pong"`, but its test asserts only that the body *is text* (`is_binary`), without checking
@@ -191,8 +192,8 @@ then checks them when reading. **It does not sign or encrypt anything** and must
 never be used for authentication. Its role is to make scheme, payload, and expiry
 mutations observable in this dependency-free demo.
 
-> Why `:ok → :error` (or `:mutare`) doesn't already cover `:http_status`, `:redirect_status`,
-> or `:download_disposition`: in those positions both of Mutare's built-in atom swaps
+> Why `:ok → :error` (or `:mutare`) doesn't already cover `:http_status` or
+> `:download_disposition`: in those positions both of Mutare's built-in atom swaps
 > **crash** (`:error`/`:mutare` aren't valid statuses, and Phoenix rejects any disposition
 > but `:attachment`/`:inline`), an uninformative kill. These families swap to a *valid*
 > sibling so a survivor means a genuine missing assertion, not a crash — and Mutare's overlap

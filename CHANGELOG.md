@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking: removed `Mutare.Phoenix.Redirect` (`:redirect_status`)** from the package
+  and preset. Phoenix reads the status from the connection. Use `mutare_plug`'s
+  `:http_status` family to mutate the status set by `Plug.Conn.put_status/2` before a
+  redirect.
+  - A configuration that lists `Mutare.Phoenix.Redirect` under `:mutators` no longer
+    resolves. Remove the entry.
+  - A `# mutare:ignore[redirect_status]` comment no longer suppresses anything. Mutare
+    reports it as ineffective, and `--strict-ignores` fails the run. Delete the comment,
+    or use `# mutare:ignore[http_status]` on the `put_status/2` call that sets the
+    redirect status.
+
 ## [0.3.1] - 2026-10-03
 
 ### Changed

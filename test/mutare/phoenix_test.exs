@@ -26,9 +26,8 @@ defmodule Mutare.PhoenixTest do
   end
 
   describe "all/0" do
-    test "is the seven families in order" do
+    test "is the six families in order" do
       assert Mutare.Phoenix.all() == [
-               Mutare.Phoenix.Redirect,
                Mutare.Phoenix.Body,
                Mutare.Phoenix.Download,
                Mutare.Phoenix.ChannelReply,
@@ -51,14 +50,13 @@ defmodule Mutare.PhoenixTest do
       specs = Mutare.Mutators.resolve([:builtins] ++ Mutare.Plug.all() ++ Mutare.Phoenix.all())
       names = Enum.map(specs, & &1.name)
 
-      assert Enum.take(names, -13) == [
+      assert Enum.take(names, -12) == [
                :plug_halt,
                :http_status,
                :plug_session,
                :resp_header,
                :resp_cookie,
                :resp_body,
-               :redirect_status,
                :controller_body,
                :download_disposition,
                :channel_reply,
@@ -153,7 +151,9 @@ defmodule Mutare.PhoenixTest do
       end
 
       def login(conn, _params) do
-        redirect(conn, to: "/login", status: :found)
+        conn
+        |> put_status(:found)
+        |> redirect(to: "/login")
       end
 
       def block(conn, _params) do
@@ -214,7 +214,6 @@ defmodule Mutare.PhoenixTest do
                :plug_halt,
                :plug_session,
                :pubsub,
-               :redirect_status,
                :resp_body,
                :resp_cookie,
                :resp_header,

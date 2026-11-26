@@ -22,10 +22,8 @@ defmodule Mutare.Phoenix do
         extensions: [Mutare.Phoenix]
       ]
 
-  `all/0` returns this package's seven families:
+  `all/0` returns this package's six families:
 
-    * `Mutare.Phoenix.Redirect` — `:redirect_status`, swaps the explicit atom
-      `:status` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling.
     * `Mutare.Phoenix.Body` — `:controller_body`, blanks the body of
       `Phoenix.Controller.json/2` (to `%{}`), `text/2`, and `html/2` (to `""`).
     * `Mutare.Phoenix.Download` — `:download_disposition`, flips the explicit
@@ -46,8 +44,8 @@ defmodule Mutare.Phoenix do
 
   It does **not** include the `mutare_plug` families; compose `Mutare.Plug.all/0` explicitly
   as shown above. Each call family matches its call written directly
-  (`Phoenix.Controller.redirect(conn, ...)`), aliased, or bare-imported
-  (`redirect(conn, ...)`, the form `use MyAppWeb, :controller` produces; `broadcast(socket,
+  (`Phoenix.Controller.json(conn, ...)`), aliased, or bare-imported
+  (`json(conn, ...)`, the form `use MyAppWeb, :controller` produces; `broadcast(socket,
   ...)`, the form `use Phoenix.Channel` produces).
 
   ## The `:extensions` entry
@@ -74,7 +72,6 @@ defmodule Mutare.Phoenix do
   # resolution happens in the target project, where they are present. The `Plug.Conn`
   # surface is the base `mutare_plug`; LiveView is the companion `mutare_phoenix_live_view`.
   @families [
-    Mutare.Phoenix.Redirect,
     Mutare.Phoenix.Body,
     Mutare.Phoenix.Download,
     Mutare.Phoenix.ChannelReply,
@@ -116,7 +113,7 @@ defmodule Mutare.Phoenix do
   the `Mutare.Plug.all/0` and `:builtins` pairing).
 
       iex> Mutare.Phoenix.all()
-      [Mutare.Phoenix.Redirect, Mutare.Phoenix.Body, Mutare.Phoenix.Download,
+      [Mutare.Phoenix.Body, Mutare.Phoenix.Download,
        Mutare.Phoenix.ChannelReply, Mutare.Phoenix.ChannelMessage, Mutare.Phoenix.PubSub,
        Mutare.Phoenix.Token]
   """

@@ -26,12 +26,11 @@ it depends on it, so those families are on your code path too, ready to compose.
 
 ## The families
 
-`Mutare.Phoenix.all/0` returns three `Phoenix.Controller` families, two `Phoenix.Channel`
+`Mutare.Phoenix.all/0` returns two `Phoenix.Controller` families, two `Phoenix.Channel`
 ones, a `Phoenix.PubSub` one, and a `Phoenix.Token` one:
 
 | Family | Name | Mutation | The gap a survivor exposes |
 | --- | --- | --- | --- |
-| `Mutare.Phoenix.Redirect` | `:redirect_status` | swaps the explicit atom `status:` option of `Phoenix.Controller.redirect/2` for a redirect-status sibling (`:found → :see_other`, `:moved_permanently → :permanent_redirect`) | no test pins the exact redirect status |
 | `Mutare.Phoenix.Body` | `:controller_body` | blanks the body argument of `Phoenix.Controller.json/2` to `%{}` and of `text/2` / `html/2` to `""` | no test reads the rendered body |
 | `Mutare.Phoenix.Download` | `:download_disposition` | flips the explicit `disposition:` option of `Phoenix.Controller.send_download/3` between `:attachment` and `:inline` | no test checks whether the response specifies saving or displaying the file |
 | `Mutare.Phoenix.ChannelReply` | `:channel_reply` | drops the reply element of a `Phoenix.Channel` callback return: `{:ok, reply, socket}` → `{:ok, socket}`, `{:reply, reply, socket}` → `{:noreply, socket}`, `{:stop, reason, reply, socket}` → `{:stop, reason, socket}` (gated on `@behaviour Phoenix.Channel`) | no test checks the join reply or `assert_reply`s the `handle_in` reply |
@@ -39,11 +38,11 @@ ones, a `Phoenix.PubSub` one, and a `Phoenix.Token` one:
 | `Mutare.Phoenix.PubSub` | `:pubsub` | removes a `Phoenix.PubSub` `subscribe`, `unsubscribe`, or broadcast call (every `broadcast`/`broadcast_from`/`local_broadcast`/`direct_broadcast` form), collapsing it to `:ok` (variants `subscribe`, `unsubscribe`, `broadcast`) | no test delivers a message on the topic and checks the subscriber reacted, or asserts a broadcast arrived |
 | `Mutare.Phoenix.Token` | `:token` | swaps a `Phoenix.Token` call for its sibling scheme (`sign` ↔ `encrypt`, `verify` ↔ `decrypt`; variant `scheme`), blanks a `sign`/`encrypt` payload to `nil` (`payload`), and turns an explicit integer `max_age:` of `verify`/`decrypt` into `:infinity` (`expiry`, with the position marked `:timeout` so the built-in integer family skips the duration literal) | no test round-trips the token, checks its payload, or passes an expired token to `verify`/`decrypt` |
 
-Each call family matches its call written directly (`Phoenix.Controller.redirect(conn, ...)`),
-aliased, or bare-imported (`redirect(conn, ...)`, the form `use MyAppWeb, :controller`
-produces; `broadcast(socket, ...)`, the form `use Phoenix.Channel` produces). The option
-families only mutate an explicit literal atom: redirects and downloads that rely on Phoenix's
-default, integer statuses, and variable values are left to other families or skipped.
+Each call family matches its call written directly (`Phoenix.Controller.json(conn, ...)`),
+aliased, or bare-imported (`json(conn, ...)`, the form `use MyAppWeb, :controller`
+produces; `broadcast(socket, ...)`, the form `use Phoenix.Channel` produces).
+`:download_disposition` requires an explicit atom literal, and the token `expiry` variant
+requires an explicit integer literal.
 `render/3` is out of scope for `:controller_body` — its argument names a template, not a
 body.
 
@@ -56,6 +55,8 @@ families that produce several kinds declare variant labels, so a qualified
 The `Plug.Conn` side of a controller action — `put_status`, `send_resp`, `put_session`,
 `put_resp_header`, `put_resp_cookie`, `halt` — is the base package's six families,
 [`Mutare.Plug.all/0`](https://hexdocs.pm/mutare_plug).
+For redirects, Phoenix reads the status from the connection, so `mutare_plug`'s
+`:http_status` mutates a status set with `put_status/2` before `redirect/2`.
 
 ## The `:extensions` entry
 
@@ -108,8 +109,8 @@ mix mutare
 
 In a status position, Mutare's built-in atom swaps (`:ok → :error` / `:mutare`) produce a
 value that **crashes** — a kill that does not indicate whether tests check the status.
-`:redirect_status` and `:download_disposition` swap to *valid* siblings (Phoenix rejects any
-disposition other than `:attachment` / `:inline`), so a survivor means a genuine missing
+`mutare_plug`'s `:http_status` and this package's `:download_disposition` swap to *valid*
+siblings (Phoenix accepts `:attachment` and `:inline` dispositions), so a survivor means a genuine missing
 assertion rather than a crash, and Mutare's overlap pruning drops the redundant crashing
 leaves at the same range. `:controller_body` works the same way for a literal `text` / `html`
 body: its whole-call blank covers the string node, so the built-in string family's sentinel
@@ -120,7 +121,7 @@ leaves there are pruned automatically and one clean "is the body read?" mutant r
 [`examples/demo`](https://github.com/foxbenjaminfox/mutare_phoenix/tree/HEAD/examples/demo) is
 a standalone mini-project with an auth plug, controller actions, a room channel,
 PubSub notifications, and invitation tokens over small framework stand-ins. Deliberate
-test gaps surface survivors in all seven Phoenix families, plus Plug halt and status.
+test gaps surface survivors in all six Phoenix families, plus Plug halt and status.
 From the repo root:
 
 ```

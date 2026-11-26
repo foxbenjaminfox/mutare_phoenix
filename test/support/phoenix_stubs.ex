@@ -76,9 +76,9 @@ defmodule Phoenix.Controller do
 
   def redirect(%Conn{} = conn, opts) when is_list(opts) do
     conn
-    |> Conn.put_status(Keyword.get(opts, :status, :found))
+    |> Conn.put_resp_header("location", opts[:to] || Keyword.fetch!(opts, :external))
     |> Conn.put_resp_content_type("text/html")
-    |> Map.put(:resp_body, Keyword.get(opts, :to) || Keyword.get(opts, :external))
+    |> Conn.send_resp(conn.status || 302, "")
   end
 end
 
